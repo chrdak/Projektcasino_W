@@ -41,6 +41,10 @@ SDL_Surface* back_img = NULL;
 
 int main( int argc, char* args[] )
 {
+
+ const int FPS=30;
+ Uint32 startValue;
+
  if( SDL_Init( SDL_INIT_VIDEO |SDL_INIT_AUDIO ) < 0 ) // Initialize video and audio
  {
    printf( "SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError() );
@@ -65,6 +69,8 @@ int main( int argc, char* args[] )
 
 while(running)
    {
+                startValue = SDL_GetTicks(); //Start frame timer
+
                 // Rectangles for positioning
 				SDL_Rect r6_Rect; // Clubs of 6
 				SDL_Rect blueback_Rect; // Backpiece
@@ -92,6 +98,10 @@ while(running)
          {
             running = false; // Gameloop flag false
          }
+      }
+
+      if(1000/FPS>SDL_GetTicks()-startValue){ //Check if frame is produced within 33.33 milliseconds --> if not then delay
+        SDL_Delay(1000/FPS-(SDL_GetTicks()-startValue));
       }
    }
 
