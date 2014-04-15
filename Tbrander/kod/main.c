@@ -174,14 +174,58 @@ bool loadMedia(){
 
 
 void card_init(DECK card []){
-    int i,j;
+    int i,j=0;
     char tmp[5];
     for (i=0;i<53;++i){
         strcpy(card[i].path,"grafik/");
         snprintf(tmp,5,"%d",i);
         strcat(card[i].path,tmp);
         strcat(card[i].path,".bmp");
-        printf("%s\n",card[i].path);
+        //printf("%s\n",card[i].path);
+
+    }
+    for (i=0;i<53;++i){
+
+        // Hearts
+        if(i<10){ // 0-9 (0=back)
+            card[i].value=j;
+            ++j;
+        }
+        else if (i>9 && i<14){ //10-13
+            j=1;
+            card[i].value=10;
+            }
+
+        //Clubbs
+        else if(i>13 && i < 23){ // 14-22
+            card[i].value=j;
+            ++j;
+        }
+        else if(i>22 && i<27){ // 23-26
+            j=1;
+            card[i].value=10;
+
+            }
+        //Diamonds
+        else if(i>26 && i < 36){ // 27-35
+            card[i].value=j;
+            ++j;
+            }
+        else if(i>35 && i<40){ // 36-39
+            j=1;
+            card[i].value=10;
+
+            }
+            //Spades
+        else if(i>39 && i < 49){ // 40-48
+            card[i].value=j;
+            ++j;
+            }
+        else if(i>48 && i<53){ // 49-52
+            j=1;
+            card[i].value=10;
+            }
+        printf("%d\n",card[i].value);
     }
 
 }
