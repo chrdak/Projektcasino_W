@@ -3,39 +3,36 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-/* Window resolution */
 #define WINDOW_WIDTH 1200
-#define WINDOW_HEIGHT 600
-
-/* Window title */
+#define WINDOW_HEIGHT 650
 #define WINDOW_TITLE "Projekt Casino"
 
-/* The window */
-SDL_Window* window = NULL;
 
-/* The window surface */
-SDL_Surface* screen = NULL;
 
-/* The event structure */
-SDL_Event event;
 
-//Loads individual image
-SDL_Surface* loadSurface();
-//Loads media
-bool loadMedia();
 
-//The final optimized image
-SDL_Surface* optimizedSurface = NULL;
 
+/*FUNKTIONS PROTOTYPER*/
+bool loadMedia(); // Function for loading images unconverted
+
+//Pathway to bmp-files stored in arrays.
 char r6[]="grafik/r6.bmp";
 char table[]="grafik/table.bmp";
 char back[]="grafik/back.bmp";
 
 
-/* The game loop flag */
-_Bool running = true;
+//Loads individual image
+SDL_Surface* loadSurface(char* path);
+SDL_Surface* table_img;
+SDL_Surface* r6_img;
+SDL_Surface* back_img;
+SDL_Window* window = NULL; //The window
+SDL_Surface* screen = NULL; // The window surface
+SDL_Event event; //Event- When user closes the window
 
-/* to put the loaded image */
+_Bool running = true; // Game loop flag
+
+/*Where the optimized image is stored, 32-bit*/
 SDL_Surface* table_img = NULL;
 SDL_Surface* r6_img = NULL;
 SDL_Surface* back_img = NULL;
@@ -44,12 +41,12 @@ SDL_Surface* back_img = NULL;
 
 int main( int argc, char* args[] )
 {
- if( SDL_Init( SDL_INIT_VIDEO ) < 0 )
+ if( SDL_Init( SDL_INIT_VIDEO |SDL_INIT_AUDIO ) < 0 ) // Initialize video and audio
  {
    printf( "SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError() );
  }
  else
- {
+ { // Window created with measurments defined globally, centered
    window = SDL_CreateWindow(
        WINDOW_TITLE,
        SDL_WINDOWPOS_CENTERED,
@@ -59,54 +56,41 @@ int main( int argc, char* args[] )
        SDL_WINDOW_SHOWN);
 
    screen = SDL_GetWindowSurface( window );
-   /*
-   if (!loadMedia){
+
+   if (!loadMedia()){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
    }
-*/
-   table_img = SDL_LoadBMP( "grafik/table.bmp" ); // Black Jack bordet
-   r6_img = SDL_LoadBMP( "grafik/r6.bmp" ); // ruter 6
-   back_img = SDL_LoadBMP( "grafik/back.bmp" ); // upp och ner vänt kort
 
-
-    SDL_BlitSurface( table_img, NULL, screen, NULL ); // Bord ritas upp
-
-    //SDL_UpdateWindowSurface( window );
+   SDL_BlitSurface( table_img, NULL, screen, NULL ); // Draw the gametable to the screen
 
 while(running)
    {
-//Apply the image stretched
-				SDL_Rect r6_Rect;
-				SDL_Rect blueback_Rect;
+                // Rectangles for positioning
+				SDL_Rect r6_Rect; // Clubs of 6
+				SDL_Rect blueback_Rect; // Backpiece
 
 				blueback_Rect.x = 280;
 				blueback_Rect.y = 315;
 				blueback_Rect.w = 59;
 				blueback_Rect.h = 95;
-				SDL_BlitScaled( back_img, NULL, screen, &blueback_Rect );
+				SDL_BlitSurface( back_img, NULL, screen, &blueback_Rect ); // Draw card image to screen
 
 				r6_Rect.x = 265;
 				r6_Rect.y = 295;
 				r6_Rect.w = 59;
 				r6_Rect.h = 95;
-				SDL_BlitScaled( r6_img, NULL, screen, &r6_Rect );
-
-
-                /*
-                SDL_BlitSurface( r6_img, NULL, screen, NULL );
-                SDL_BlitSurface( back_img, &blue_back, screen, NULL );
-                */
+                SDL_BlitSurface( r6_img, NULL, screen, &r6_Rect); // Draw card image to screen
 
                 //Update the surface
                 SDL_UpdateWindowSurface( window );
 
                 sleep(1);
 
-      while( SDL_PollEvent( &event ) != 0 )
+      while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
       {
          if( event.type == SDL_QUIT )
          {
-            running = false;
+            running = false; // Gameloop flag false
          }
       }
    }
@@ -114,6 +98,7 @@ while(running)
 
 
  }
+ // Free the allocated space
  SDL_FreeSurface( table_img );
  SDL_FreeSurface( back_img );
  SDL_FreeSurface( r6_img );
@@ -122,29 +107,30 @@ while(running)
  return 0;
 }
 //*************************************************************************************
-/*
 
-SDL_Surface* loadSurface(char path[])
+
+SDL_Surface* loadSurface(char* path) //Function to format the 24bit image to 32bit
 {
-
 	//The final optimized image
-	SDL_Surface* optimizedSurface = NULL;
+	SDL_Surface* optimizedSurface = NULL; // Här lagras den optimerade 32bitars bilden
 
 	//Load image at specified path
-	SDL_Surface* loadedSurface = SDL_LoadBMP("grafik/table.bmp");
-	if( loadedSurface == NULL ){
+	SDL_Surface* loadedSurface = SDL_LoadBMP(path);
+	if( loadedSurface == NULL )
+	{
 		printf( "Unable to load image %s! SDL Error: %s\n", path, SDL_GetError() );
 	}
 	else
 	{
 		//Convert surface to screen format
-		optimizedSurface = SDL_ConvertSurface( loadedSurface, screen->format, NULL );
-		if( optimizedSurface == NULL ){
+		optimizedSurface = SDL_ConvertSurface( loadedSurface, screen->format, SDL_SWSURFACE );
+		if( optimizedSurface == NULL )
+		{
 			printf( "Unable to optimize image %s! SDL Error: %s\n", path, SDL_GetError() );
 		}
 
 		//Get rid of old loaded surface
-		SDL_FreeSurface( loadedSurface );
+		SDL_FreeSurface( loadedSurface ); // Släng 24-bit
 	}
 
 	return optimizedSurface;
@@ -156,7 +142,8 @@ bool loadMedia(){
     //Loading success flag
     bool success = true;
 
-    //Load stretching surface
+    /* ------ Convert the 24bit image to the optimized 32bit ------ */
+
     table_img=loadSurface(table);
     if( table_img == NULL ){
         printf( "Failed to load image!\n" );
@@ -175,4 +162,4 @@ bool loadMedia(){
 
     return success;
 }
-*/
+
