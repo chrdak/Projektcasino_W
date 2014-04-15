@@ -2,24 +2,30 @@
 #include <SDL/SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+
 #include <string.h>
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 650
 #define WINDOW_TITLE "Projekt Casino"
 
 
-
-
+struct card{
+    char path[100];
+    int type;
+    int value;
+    SDL_Surface* card_img;
+};
+typedef struct card DECK;
 
 
 /*FUNKTIONS PROTOTYPER*/
 bool loadMedia(); // Function for loading images unconverted
-
+void card_init(DECK card[]); // Initialize the card deck
 //Pathway to bmp-files stored in arrays.
 char r6[]="grafik/r6.bmp";
 char table[]="grafik/table.bmp";
 char back[]="grafik/back.bmp";
-
 
 //Loads individual image
 SDL_Surface* loadSurface(char* path);
@@ -39,27 +45,25 @@ SDL_Surface* back_img = NULL;
 
 //************************************ MAIN *********************************************
 
-int main( int argc, char* args[] )
-{
+int main( int argc, char* args[] ) {
 
- const int FPS=30;
- Uint32 startValue;
+    DECK card[60];
+    card_init(card);
 
- if( SDL_Init( SDL_INIT_VIDEO |SDL_INIT_AUDIO ) < 0 ) // Initialize video and audio
- {
-   printf( "SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError() );
- }
- else
- { // Window created with measurments defined globally, centered
-   window = SDL_CreateWindow(
-       WINDOW_TITLE,
-       SDL_WINDOWPOS_CENTERED,
-       SDL_WINDOWPOS_CENTERED,
-       WINDOW_WIDTH,
-       WINDOW_HEIGHT,
-       SDL_WINDOW_SHOWN);
-
-   screen = SDL_GetWindowSurface( window );
+    if( SDL_Init( SDL_INIT_VIDEO |SDL_INIT_AUDIO ) < 0 ) // Initialize video and audio
+    {
+    printf( "SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError() );
+    }
+    else
+    { // Window created with measurments defined globally, centered
+        window = SDL_CreateWindow(
+        WINDOW_TITLE,
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        WINDOW_WIDTH,
+        WINDOW_HEIGHT,
+        SDL_WINDOW_SHOWN);
+        screen = SDL_GetWindowSurface( window );
 
    if (!loadMedia()){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
@@ -69,8 +73,6 @@ int main( int argc, char* args[] )
 
 while(running)
    {
-                startValue = SDL_GetTicks(); //Start frame timer
-
                 // Rectangles for positioning
 				SDL_Rect r6_Rect; // Clubs of 6
 				SDL_Rect blueback_Rect; // Backpiece
@@ -98,10 +100,6 @@ while(running)
          {
             running = false; // Gameloop flag false
          }
-      }
-
-      if(1000/FPS>SDL_GetTicks()-startValue){ //Check if frame is produced within 33.33 milliseconds --> if not then delay
-        SDL_Delay(1000/FPS-(SDL_GetTicks()-startValue));
       }
    }
 
@@ -173,3 +171,17 @@ bool loadMedia(){
     return success;
 }
 
+
+
+void card_init(DECK card []){
+    int i,j;
+    char tmp[5];
+    for (i=0;i<53;++i){
+        strcpy(card[i].path,"grafik/");
+        snprintf(tmp,5,"%d",i);
+        strcat(card[i].path,tmp);
+        strcat(card[i].path,".bmp");
+        printf("%s\n",card[i].path);
+    }
+
+}
