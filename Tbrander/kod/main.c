@@ -1,10 +1,11 @@
 #include <SDL2/SDL.h>
+#include <SDL/SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 /* Window resolution */
-#define WINDOW_WIDTH 1162
-#define WINDOW_HEIGHT 568
+#define WINDOW_WIDTH 1200
+#define WINDOW_HEIGHT 600
 
 /* Window title */
 #define WINDOW_TITLE "Projekt Casino"
