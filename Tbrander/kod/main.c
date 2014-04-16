@@ -6,54 +6,113 @@
 
 #include <string.h>
 #define WINDOW_WIDTH 1200
-#define WINDOW_HEIGHT 650
+#define WINDOW_HEIGHT 600
 #define WINDOW_TITLE "Projekt Casino"
-
 
 struct card{
     char path[100];
-    int type;
+    int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
     int value;
     SDL_Surface* card_img;
+    SDL_Rect CardPos;
 };
 typedef struct card DECK;
 
 
 /*FUNKTIONS PROTOTYPER*/
-bool loadMedia(); // Function for loading images unconverted
+bool loadMedia(DECK card[]); // Function for loading images unconverted
 void card_init(DECK card[]); // Initialize the card deck
-//Pathway to bmp-files stored in arrays.
-char r6[]="grafik/r6.bmp";
-char table[]="grafik/table.bmp";
-char back[]="grafik/back.bmp";
+void SDL_initializer();
+void game_running(DECK card[]);
+DECK* shuffleDeck(DECK card[]);
+//-------------------------------------------------
 
-//Loads individual image
-SDL_Surface* loadSurface(char* path);
-SDL_Surface* table_img;
-SDL_Surface* r6_img;
-SDL_Surface* back_img;
-SDL_Window* window = NULL; //The window
-SDL_Surface* screen = NULL; // The window surface
-SDL_Event event; //Event- When user closes the window
+/*Global variables*/
+SDL_Surface* loadSurface(char* path); //Loads individual image
+SDL_Surface* table_img = NULL;        //Loaded converted image
+SDL_Window* window = NULL;            //The window
+SDL_Surface* screen = NULL;           // The window surface
+SDL_Event event;                      //Event- When user closes the window
+_Bool running = true;                 // Game loop flag
 
-_Bool running = true; // Game loop flag
-
-/*Where the optimized image is stored, 32-bit*/
-SDL_Surface* table_img = NULL;
-SDL_Surface* r6_img = NULL;
-SDL_Surface* back_img = NULL;
+char table[50]="grafik/casino_v2.bmp";
 
 //************************************ MAIN *********************************************
 
 int main( int argc, char* args[] ) {
-
-    DECK card[60];
+    DECK* shuffledDeck;
+    DECK card[60];      // struct array (path,type,value)
     card_init(card);
+    SDL_initializer();
+    shuffledDeck = shuffleDeck(card);
+
+    if (!loadMedia(shuffledDeck)){ // Calling function for loading 24-bit images in to the memory
+        printf("Cant load img.\n");
+    }
+    SDL_BlitSurface( table_img, NULL, screen, NULL ); // Draw the gametable to the screen
+
+    game_running(shuffledDeck);
+
+
+ // Free the allocated space
+ SDL_FreeSurface(table_img);
+ //SDL_FreeSurface( back_img );
+ //SDL_FreeSurface( r6_img );
+ SDL_DestroyWindow( window );
+ SDL_Quit();
+ return 0;
+}
+//*************************************************************************************
+
+void game_running(DECK card[]){
+    int i=0, random_card=0;
+    while(running){
+        // Rectangles for positioning
+        card[4].CardPos.x=500;
+        card[4].CardPos.y=400;
+        card[4].CardPos.w=75;
+        card[4].CardPos.h=111;
+        SDL_BlitScaled(card[4].card_img, NULL, screen, &card[4].CardPos);
+        //SDL_BlitSurface( card[3].card_img, NULL, screen, &card[3].CardPos); // Draw card image to screen
+        ++i;
+        //Update the surface
+        SDL_UpdateWindowSurface( window );
+
+        sleep(2);
+
+          while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
+          {
+             if( event.type == SDL_QUIT )
+             {
+                running = false; // Gameloop flag false
+             }
+          }
+     }
+}
+
+DECK* shuffleDeck(DECK card[]){
+    int i,j;
+
+    DECK* tmp=malloc(sizeof(card));
+    srand(time(NULL));
+    for (i=1; i<53;++i){
+        j= rand()%52;
+        tmp[i]=card[i];
+        card[i]=card[j];
+        card[j]=tmp[i];
+    }
+    //free (tmp);
+    return card;
+}
+
+
+void SDL_initializer(){
 
     if( SDL_Init( SDL_INIT_VIDEO |SDL_INIT_AUDIO ) < 0 ) // Initialize video and audio
-    {
-    printf( "SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError() );
-    }
+        {
+        printf( "SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError() );
+        exit(1);
+        }
     else
     { // Window created with measurments defined globally, centered
         window = SDL_CreateWindow(
@@ -64,57 +123,10 @@ int main( int argc, char* args[] ) {
         WINDOW_HEIGHT,
         SDL_WINDOW_SHOWN);
         screen = SDL_GetWindowSurface( window );
+    }
 
-   if (!loadMedia()){ // Calling function for loading 24-bit images in to the memory
-        printf("Cant load img.\n");
-   }
-
-   SDL_BlitSurface( table_img, NULL, screen, NULL ); // Draw the gametable to the screen
-
-while(running)
-   {
-                // Rectangles for positioning
-				SDL_Rect r6_Rect; // Clubs of 6
-				SDL_Rect blueback_Rect; // Backpiece
-
-				blueback_Rect.x = 280;
-				blueback_Rect.y = 315;
-				blueback_Rect.w = 59;
-				blueback_Rect.h = 95;
-				SDL_BlitSurface( back_img, NULL, screen, &blueback_Rect ); // Draw card image to screen
-
-				r6_Rect.x = 265;
-				r6_Rect.y = 295;
-				r6_Rect.w = 59;
-				r6_Rect.h = 95;
-                SDL_BlitSurface( r6_img, NULL, screen, &r6_Rect); // Draw card image to screen
-
-                //Update the surface
-                SDL_UpdateWindowSurface( window );
-
-                sleep(1);
-
-      while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
-      {
-         if( event.type == SDL_QUIT )
-         {
-            running = false; // Gameloop flag false
-         }
-      }
-   }
-
-
-
- }
- // Free the allocated space
- SDL_FreeSurface( table_img );
- SDL_FreeSurface( back_img );
- SDL_FreeSurface( r6_img );
- SDL_DestroyWindow( window );
- SDL_Quit();
- return 0;
 }
-//*************************************************************************************
+
 
 
 SDL_Surface* loadSurface(char* path) //Function to format the 24bit image to 32bit
@@ -146,9 +158,10 @@ SDL_Surface* loadSurface(char* path) //Function to format the 24bit image to 32b
 
 
 
-bool loadMedia(){
+bool loadMedia(DECK card[]){
     //Loading success flag
     bool success = true;
+    int i=0;
 
     /* ------ Convert the 24bit image to the optimized 32bit ------ */
 
@@ -157,75 +170,80 @@ bool loadMedia(){
         printf( "Failed to load image!\n" );
         success = false;
     }
-    r6_img=loadSurface(r6);
-    if( r6_img == NULL ){
-        printf( "Failed to load image!\n" );
-        success = false;
-    }
-    back_img=loadSurface(back);
-    if( back_img == NULL ){
-        printf( "Failed to load image!\n" );
-        success = false;
-    }
 
+    for(i=0;i<54;++i){
+        card[i].card_img=loadSurface(card[i].path);
+        if( card[i].card_img == NULL ){
+            printf( "Failed to load image!\n");
+            success = false;
+        }
+    }
     return success;
 }
 
 
 
-void card_init(DECK card []){
-    int i,j=0;
+void card_init(DECK card[]){
+    int i=0,j=0;
     char tmp[5];
     for (i=0;i<53;++i){
-        strcpy(card[i].path,"grafik/");
+        strcpy(card[i].path,"grafik/cards/");
         snprintf(tmp,5,"%d",i);
         strcat(card[i].path,tmp);
         strcat(card[i].path,".bmp");
         //printf("%s\n",card[i].path);
-
     }
-    for (i=0;i<53;++i){
 
+    card[0].value=0; card[0].type=0; // Value and type for the back piece (blue)
+    card[53].value=0; card[53].type=0; // Value and type for the back piece (red)
+
+    for (i=1;i<53;++i){
         // Hearts
         if(i<10){ // 0-9 (0=back)
             card[i].value=j;
             ++j;
+            card[i].type=1; // Hearts =1
         }
         else if (i>9 && i<14){ //10-13
             j=1;
             card[i].value=10;
+            card[i].type=1; // Hearts =1
             }
 
         //Clubbs
         else if(i>13 && i < 23){ // 14-22
             card[i].value=j;
             ++j;
+            card[i].type=2; // Clubbs =2
         }
         else if(i>22 && i<27){ // 23-26
             j=1;
             card[i].value=10;
-
+            card[i].type=2; // Clubbs =2
             }
         //Diamonds
         else if(i>26 && i < 36){ // 27-35
             card[i].value=j;
             ++j;
+            card[i].type=3; // Diamonds =3
             }
         else if(i>35 && i<40){ // 36-39
             j=1;
             card[i].value=10;
-
+            card[i].type=3; // Diamonds =3
             }
             //Spades
         else if(i>39 && i < 49){ // 40-48
             card[i].value=j;
             ++j;
+            card[i].type=4; // Spades =4
             }
         else if(i>48 && i<53){ // 49-52
             j=1;
             card[i].value=10;
+            card[i].type=4; // Spades =4
             }
-        printf("%d\n",card[i].value);
+        //printf("%d\n",card[i].value);
     }
 
 }
