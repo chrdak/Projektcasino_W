@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <time.h>
 #include <string.h>
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 600
@@ -24,7 +24,7 @@ bool loadMedia(DECK card[]); // Function for loading images unconverted
 void card_init(DECK card[]); // Initialize the card deck
 void SDL_initializer();
 void game_running(DECK card[]);
-DECK* shuffleDeck(DECK card[]);
+void shuffleDeck(DECK card[]);
 //-------------------------------------------------
 
 /*Global variables*/
@@ -40,18 +40,18 @@ char table[50]="grafik/casino_v2.bmp";
 //************************************ MAIN *********************************************
 
 int main( int argc, char* args[] ) {
-    DECK* shuffledDeck;
+    srand(time(NULL));
     DECK card[60];      // struct array (path,type,value)
     card_init(card);
     SDL_initializer();
-    shuffledDeck = shuffleDeck(card);
+    shuffleDeck(card);
 
-    if (!loadMedia(shuffledDeck)){ // Calling function for loading 24-bit images in to the memory
+    if (!loadMedia(card)){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
     SDL_BlitSurface( table_img, NULL, screen, NULL ); // Draw the gametable to the screen
 
-    game_running(shuffledDeck);
+    game_running(card);
 
 
  // Free the allocated space
@@ -90,19 +90,15 @@ void game_running(DECK card[]){
      }
 }
 
-DECK* shuffleDeck(DECK card[]){
+void shuffleDeck(DECK card[]){
     int i,j;
-
-    DECK* tmp=malloc(sizeof(card));
-    srand(time(NULL));
+    DECK tmp[60];
     for (i=1; i<53;++i){
         j= rand()%52;
         tmp[i]=card[i];
         card[i]=card[j];
         card[j]=tmp[i];
     }
-    //free (tmp);
-    return card;
 }
 
 
