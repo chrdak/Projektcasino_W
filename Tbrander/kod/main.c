@@ -18,13 +18,18 @@ struct card{
 };
 typedef struct card DECK;
 
+struct player_pos_value{
+    int score, x1, y1,x2,y2;
+};
+typedef struct player_pos_value PLAYER;
 
 /*FUNKTIONS PROTOTYPER*/
 bool loadMedia(DECK card[]); // Function for loading images unconverted
-void card_init(DECK card[]); // Initialize the card deck
+void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
 void SDL_initializer();
-void game_running(DECK card[]);
+void game_running(DECK card[],PLAYER usr[]);
 void shuffleDeck(DECK card[]);
+void deal_cards(PLAYER usr[],DECK card[]);
 //-------------------------------------------------
 
 /*Global variables*/
@@ -42,7 +47,8 @@ char table[50]="grafik/casino_v2.bmp";
 int main( int argc, char* args[] ) {
     srand(time(NULL));
     DECK card[60];      // struct array (path,type,value)
-    card_init(card);
+    PLAYER usr[5];
+    card_init(card,usr);
     SDL_initializer();
     shuffleDeck(card);
 
@@ -50,8 +56,7 @@ int main( int argc, char* args[] ) {
         printf("Cant load img.\n");
     }
     SDL_BlitSurface( table_img, NULL, screen, NULL ); // Draw the gametable to the screen
-
-    game_running(card);
+    game_running(card,usr);
 
 
  // Free the allocated space
@@ -63,27 +68,42 @@ int main( int argc, char* args[] ) {
  return 0;
 }
 //*************************************************************************************
-
-void game_running(DECK card[]){
-    int i=0, random_card=0;
-    while(running){
+void deal_cards(PLAYER usr[],DECK card[]){
+    int i=0,j=0;
+    for(i=0;i<5;i++){
         // Rectangles for positioning
-        card[4].CardPos.x=500;
-        card[4].CardPos.y=400;
-        card[4].CardPos.w=75;
-        card[4].CardPos.h=111;
-        SDL_BlitScaled(card[4].card_img, NULL, screen, &card[4].CardPos);
-        //SDL_BlitSurface( card[3].card_img, NULL, screen, &card[3].CardPos); // Draw card image to screen
-        ++i;
-        //Update the surface
+        card[i].CardPos.x=usr[j].x1;
+        card[i].CardPos.y=usr[j].y1;
+        card[i].CardPos.w=75;
+        card[i].CardPos.h=111;
+        SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
+        ++j;
         SDL_UpdateWindowSurface( window );
+    }
+    j=1;
+       /* for(i=5;i<11;i++){
+        // Rectangles for positioning
+        card[i].CardPos.x=usr[j].x2;
+        card[i].CardPos.y=usr[j].y2;
+        card[i].CardPos.w=75;
+        card[i].CardPos.h=111;
+        SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
+        ++j;
+        //SDL_UpdateWindowSurface( window );
+   }
+   */
+SDL_UpdateWindowSurface( window );
+    //Update the surface
 
+}
+
+void game_running(DECK card[],PLAYER usr[]){
+    while(running){
+        deal_cards(usr,card);
         sleep(2);
-
-          while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
+        while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
           {
-             if( event.type == SDL_QUIT )
-             {
+             if( event.type == SDL_QUIT ){
                 running = false; // Gameloop flag false
              }
           }
@@ -94,7 +114,7 @@ void shuffleDeck(DECK card[]){
     int i,j;
     DECK tmp[60];
     for (i=1; i<53;++i){
-        j= rand()%52;
+        j= rand()%52+1;
         tmp[i]=card[i];
         card[i]=card[j];
         card[j]=tmp[i];
@@ -122,8 +142,6 @@ void SDL_initializer(){
     }
 
 }
-
-
 
 SDL_Surface* loadSurface(char* path) //Function to format the 24bit image to 32bit
 {
@@ -153,7 +171,6 @@ SDL_Surface* loadSurface(char* path) //Function to format the 24bit image to 32b
 }
 
 
-
 bool loadMedia(DECK card[]){
     //Loading success flag
     bool success = true;
@@ -178,11 +195,10 @@ bool loadMedia(DECK card[]){
 }
 
 
-
-void card_init(DECK card[]){
-    int i=0,j=0;
+void card_init(DECK card[], PLAYER usr[]){
+    int i=0,j=1;
     char tmp[5];
-    for (i=0;i<53;++i){
+    for (i=0;i<54;++i){
         strcpy(card[i].path,"grafik/cards/");
         snprintf(tmp,5,"%d",i);
         strcat(card[i].path,tmp);
@@ -239,7 +255,24 @@ void card_init(DECK card[]){
             card[i].value=10;
             card[i].type=4; // Spades =4
             }
-        //printf("%d\n",card[i].value);
     }
+
+    // Initializeing card positions for each player.
+    //Dealer
+    usr[0].x1=0; usr[0].y1=0;
+    usr[0].x2=155; usr[0].y2=55;
+
+    usr[1].x1=150; usr[1].y1=400;
+    usr[1].x2=180; usr[1].y2=420;
+
+    usr[2].x1=150; usr[2].y1=400;
+    usr[2].x2=180; usr[2].y2=420;
+
+    usr[3].x1=150; usr[3].y1=400;
+    usr[3].x2=180; usr[3].y2=420;
+
+    usr[4].x1=150; usr[4].y1=400;
+    usr[4].x2=180; usr[4].y2=420;
+
 
 }
