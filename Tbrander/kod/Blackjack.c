@@ -68,7 +68,7 @@ void playP1(DECK p1 [],DECK card [],int *next,int *totp1){
     int sv=0, r=2,i;
     while(sv!=2){
         if(*totp1>=21)break;
-        printf("\nDo you want to 1.hit, 2.stay (pick 1 or 2)\n\n");
+        printf("\nDo you want to 1.hit or 2.stay (pick 1 or 2)\n\n");
         scanf("%d",&sv);
         if(sv==1){
             p1[r]=card[*next];
@@ -90,7 +90,7 @@ void dealc(DECK card [], DECK p1 [], DECK com []){
     com[0]=card[2];
     p1[1]=card[3];
     com[1]=card[4];
-    printf("Player 1:s cards values: %d and %d\n\n",p1[0].value,p1[1].value);
+    printf("Players cards values: %d and %d\n\n",p1[0].value,p1[1].value);
 
     printf("Dealers card value: %d and one card face down\n",com[0].value);
 }
