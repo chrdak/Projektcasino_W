@@ -31,6 +31,7 @@ void SDL_initializer();
 void game_running(DECK card[],PLAYER usr[]);
 void shuffleDeck(DECK card[]);
 void deal_cards(PLAYER usr[],DECK card[]);
+void quit(DECK card[]);
 //-------------------------------------------------
 
 /*Global variables*/
@@ -57,15 +58,8 @@ int main( int argc, char* args[] ) {
         printf("Cant load img.\n");
     }
     SDL_BlitSurface( table_img, NULL, screen, NULL ); // Draw the gametable to the screen
-    game_running(card,usr);
+    game_running(card,usr); // game loop
 
-
- // Free the allocated space
- SDL_FreeSurface(table_img);
- //SDL_FreeSurface( back_img );
- //SDL_FreeSurface( r6_img );
- SDL_DestroyWindow( window );
- SDL_Quit();
  return 0;
 }
 //*************************************************************************************
@@ -106,6 +100,7 @@ void game_running(DECK card[],PLAYER usr[]){
           {
              if( event.type == SDL_QUIT ){
                 running = false; // Gameloop flag false
+                quit(card);
              }
           }
      }
@@ -301,6 +296,16 @@ void card_init(DECK card[], PLAYER usr[]){
     // Player 4
     usr[4].x1=840; usr[4].y1=350;
     usr[4].x2=920; usr[4].y2=350;
+}
 
 
+void quit(DECK card[]){
+    int i;
+    // Frigör bilder för spelkorten.
+    for (i=0;i<53;++i){
+        SDL_FreeSurface(card[i].card_img);
+    }
+    SDL_FreeSurface(table_img); // Frigör bild för Black Jack bordet.
+    SDL_DestroyWindow(window);  // Dödar fönstret
+    SDL_Quit();
 }
