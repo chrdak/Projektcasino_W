@@ -40,7 +40,7 @@ SDL_Surface* screen = NULL;           // The window surface
 SDL_Event event;                      //Event- When user closes the window
 _Bool running = true;                 // Game loop flag
 
-char table[50]="grafik/casino_v2.bmp";
+char table[50]="grafik/casino_v3.bmp";
 
 //************************************ MAIN *********************************************
 
@@ -70,18 +70,18 @@ int main( int argc, char* args[] ) {
 //*************************************************************************************
 void deal_cards(PLAYER usr[],DECK card[]){
     int i=0,j=0;
-    for(i=0;i<5;i++){
+    for(i=0;i<5;++i){
         // Rectangles for positioning
         card[i].CardPos.x=usr[j].x1;
         card[i].CardPos.y=usr[j].y1;
-        card[i].CardPos.w=75;
-        card[i].CardPos.h=111;
+        card[i].CardPos.w=70;
+        card[i].CardPos.h=106;
         SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
         ++j;
-        SDL_UpdateWindowSurface( window );
+        SDL_UpdateWindowSurface(window);
     }
-    j=1;
-       /* for(i=5;i<11;i++){
+    j=0;
+        for(i=5;i<10;++i){
         // Rectangles for positioning
         card[i].CardPos.x=usr[j].x2;
         card[i].CardPos.y=usr[j].y2;
@@ -89,10 +89,10 @@ void deal_cards(PLAYER usr[],DECK card[]){
         card[i].CardPos.h=111;
         SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
         ++j;
-        //SDL_UpdateWindowSurface( window );
+        SDL_UpdateWindowSurface(window);
    }
-   */
-SDL_UpdateWindowSurface( window );
+
+SDL_UpdateWindowSurface(window);
     //Update the surface
 
 }
@@ -203,7 +203,6 @@ void card_init(DECK card[], PLAYER usr[]){
         snprintf(tmp,5,"%d",i);
         strcat(card[i].path,tmp);
         strcat(card[i].path,".bmp");
-        //printf("%s\n",card[i].path);
     }
 
     card[0].value=0; card[0].type=0; // Value and type for the back piece (blue)
@@ -257,22 +256,22 @@ void card_init(DECK card[], PLAYER usr[]){
             }
     }
 
-    // Initializeing card positions for each player.
+    // Initializeing card positions for each player, from the left.
     //Dealer
-    usr[0].x1=0; usr[0].y1=0;
-    usr[0].x2=155; usr[0].y2=55;
-
-    usr[1].x1=150; usr[1].y1=400;
-    usr[1].x2=180; usr[1].y2=420;
-
-    usr[2].x1=150; usr[2].y1=400;
-    usr[2].x2=180; usr[2].y2=420;
-
-    usr[3].x1=150; usr[3].y1=400;
-    usr[3].x2=180; usr[3].y2=420;
-
-    usr[4].x1=150; usr[4].y1=400;
-    usr[4].x2=180; usr[4].y2=420;
+    usr[0].x1=500; usr[0].y1=90;
+    usr[0].x2=600; usr[0].y2=90;
+    // Player 1
+    usr[1].x1=160; usr[1].y1=350;
+    usr[1].x2=240; usr[1].y2=350;
+    //Player 2
+    usr[2].x1=380; usr[2].y1=400;
+    usr[2].x2=460; usr[2].y2=400;
+    // Player 3
+    usr[3].x1=600; usr[3].y1=400;
+    usr[3].x2=680; usr[3].y2=400;
+    // Player 4
+    usr[4].x1=840; usr[4].y1=350;
+    usr[4].x2=920; usr[4].y2=350;
 
 
 }
