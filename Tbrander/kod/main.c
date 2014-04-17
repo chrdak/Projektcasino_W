@@ -12,7 +12,8 @@
 struct card{
     char path[100];
     int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
-    int value;
+    int game_value;
+    int real_value;
     SDL_Surface* card_img;
     SDL_Rect CardPos;
 };
@@ -46,7 +47,7 @@ char table[50]="grafik/casino_v3.bmp";
 
 int main( int argc, char* args[] ) {
     srand(time(NULL));
-    DECK card[60];      // struct array (path,type,value)
+    DECK card[60];      // struct array (path,type,game_value)
     PLAYER usr[5];
     card_init(card,usr);
     SDL_initializer();
@@ -196,7 +197,7 @@ bool loadMedia(DECK card[]){
 
 
 void card_init(DECK card[], PLAYER usr[]){
-    int i=0,j=1;
+    int i=0,j=1,h=10;
     char tmp[5];
     for (i=0;i<54;++i){
         strcpy(card[i].path,"grafik/cards/");
@@ -205,56 +206,84 @@ void card_init(DECK card[], PLAYER usr[]){
         strcat(card[i].path,".bmp");
     }
 
-    card[0].value=0; card[0].type=0; // Value and type for the back piece (blue)
-    card[53].value=0; card[53].type=0; // Value and type for the back piece (red)
+    card[0].game_value=0; card[0].type=0; // Value and type for the back piece (blue)
+    card[53].game_value=0; card[53].type=0; // Value and type for the back piece (red)
 
     for (i=1;i<53;++i){
         // Hearts
-        if(i<10){ // 0-9 (0=back)
-            card[i].value=j;
+        if(i<10){ // 1-9
+            card[i].game_value=j;
             ++j;
             card[i].type=1; // Hearts =1
         }
         else if (i>9 && i<14){ //10-13
             j=1;
-            card[i].value=10;
+            card[i].game_value=10;
             card[i].type=1; // Hearts =1
             }
 
         //Clubbs
         else if(i>13 && i < 23){ // 14-22
-            card[i].value=j;
+            card[i].game_value=j;
             ++j;
             card[i].type=2; // Clubbs =2
         }
         else if(i>22 && i<27){ // 23-26
             j=1;
-            card[i].value=10;
+            card[i].game_value=10;
             card[i].type=2; // Clubbs =2
             }
         //Diamonds
         else if(i>26 && i < 36){ // 27-35
-            card[i].value=j;
+            card[i].game_value=j;
             ++j;
             card[i].type=3; // Diamonds =3
             }
         else if(i>35 && i<40){ // 36-39
             j=1;
-            card[i].value=10;
+            card[i].game_value=10;
             card[i].type=3; // Diamonds =3
             }
             //Spades
         else if(i>39 && i < 49){ // 40-48
-            card[i].value=j;
+            card[i].game_value=j;
             ++j;
             card[i].type=4; // Spades =4
             }
         else if(i>48 && i<53){ // 49-52
             j=1;
-            card[i].value=10;
+            card[i].game_value=10;
             card[i].type=4; // Spades =4
             }
     }
+    // Här ges klädda kort sina riktiga värden
+    for(i=10;i<4;++i){
+        card[i].real_value=h;
+        ++h;
+    }
+    h=10;
+    for(i=23;i<4;++i){
+        card[i].real_value=h;
+        ++h;
+    }
+    h=10;
+    for(i=36;i<4;++i){
+        card[i].real_value=h;
+        ++h;
+    }
+    h=10;
+    for(i=49;i<4;++i){
+        card[i].real_value=h;
+        ++h;
+    }
+    // ------------------------------------------
+
+
+    // Black Jack-värde och riktigt värde för alla Ess
+    card[1].game_value=11;card[1].real_value=14;
+    card[14].game_value=11;card[14].real_value=14;
+    card[27].game_value=11;card[27].real_value=14;
+    card[40].game_value=11;card[40].real_value=14;
 
     // Initializeing card positions for each player, from the left.
     //Dealer
