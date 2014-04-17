@@ -5,9 +5,25 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <assert.h>
+#include <netinet/in.h>
+#include "lib/server.h"
+#define PORTNUM 25780
+#define SOCK_PATH "Casino_socket"
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 600
 #define WINDOW_TITLE "Projekt Casino"
+
+// --------------------------------------------------------------------------------------------------
+
 
 struct card{
     char path[100];
@@ -21,7 +37,8 @@ typedef struct card DECK;
 
 struct player_pos_value{
     int score, x1, y1,x2,y2;
-};
+    DECK hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om tilldelade kort, färg, värden..
+};                 // Plats [0] är första tilldelade kortet osv.
 typedef struct player_pos_value PLAYER;
 
 /*FUNKTIONS PROTOTYPER*/
@@ -46,6 +63,8 @@ char table[50]="grafik/casino_v3.bmp";
 
 //************************************ MAIN *********************************************
 
+
+
 int main( int argc, char* args[] ) {
     srand(time(NULL));
     DECK card[60];      // struct array (path,type,game_value)
@@ -62,7 +81,7 @@ int main( int argc, char* args[] ) {
 
  return 0;
 }
-//*************************************************************************************
+//***************************************************************************************
 void deal_cards(PLAYER usr[],DECK card[]){
     int i=0,j=0;
     for(i=0;i<5;++i){
@@ -104,6 +123,7 @@ void game_running(DECK card[],PLAYER usr[]){
              }
           }
      }
+
 }
 
 void shuffleDeck(DECK card[]){
@@ -139,8 +159,7 @@ void SDL_initializer(){
 
 }
 
-SDL_Surface* loadSurface(char* path) //Function to format the 24bit image to 32bit
-{
+SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32bit
 	//The final optimized image
 	SDL_Surface* optimizedSurface = NULL; // Här lagras den optimerade 32bitars bilden
 
@@ -309,3 +328,75 @@ void quit(DECK card[]){
     SDL_DestroyWindow(window);  // Dödar fönstret
     SDL_Quit();
 }
+
+
+
+/*         DEMON        */
+
+static void daemonize(void){
+    pid_t pid, sid;
+    //already a daemon /
+    if ( getppid() == 1 ) return;
+    //Fork off the parent process /
+    pid = fork();
+    if (pid < 0) {
+        exit(EXIT_FAILURE);
+    }
+    // If we got a good PID, then we can exit the parent process. /
+    if (pid > 0) {
+        exit(EXIT_SUCCESS);
+    }
+    // At this point we are executing as the child process /
+    // Change the file mode mask /
+    umask(0);
+    // Create a new SID for the child process /
+
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+    // Change the current working directory.  This prevents the current
+      // directory from being locked; hence not being able to remove it.
+
+    pid = fork();
+    if(pid>0){
+        if ((chdir("/")) < 0) {
+            exit(EXIT_FAILURE);
+        }
+        // Redirect standard files to /dev/null
+        freopen( "/dev/null", "r", stdin);
+        freopen( "/dev/null", "w", stdout);
+        freopen( "/dev/null", "w", stderr);
+    }
+}
+
+
+/*      SERVERKOD
+int server(){
+    int server_socket, client_socket,consocket=0;
+    struct sockaddr_in serv, dest;
+    char msg[] = "Connected with server.\n";
+
+    //daemonize();
+
+    pid=getpid();
+    int listen_socket; // socket used to listen for incoming connections
+    socklen_t socksize = sizeof(struct sockaddr_in);
+    memset(&serv, 0, sizeof(serv));           // zero the struct before filling the fields
+    serv.sin_family = AF_INET;                // set the type of connection to TCP/IP
+    serv.sin_addr.s_addr = htonl(INADDR_ANY); // set our address to any interface
+    serv.sin_port = htons(PORTNUM);
+    listen_socket = socket(AF_INET, SOCK_STREAM, 0);
+    bind(listen_socket, (struct sockaddr *)&serv, sizeof(struct sockaddr));
+    listen(listen_socket, 5);
+
+
+    printf("Incoming connection from %s - sending welcome\n", inet_ntoa(dest.sin_addr));
+
+    send(consocket, msg, strlen(msg), 0);
+    consocket = accept(listen_socket, (struct sockaddr *)&dest, &socksize);
+
+
+    // Nu finns de en anslutning, och nedan kan kod för kommunikationen över socketen finnas.
+}
+    */
