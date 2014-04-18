@@ -1,5 +1,4 @@
 #include <SDL2/SDL.h>
-#include <SDL/SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +15,7 @@
 #include <assert.h>
 #include <netinet/in.h>
 #include "lib/server.h"
+
 #define PORTNUM 25780
 #define SOCK_PATH "Casino_socket"
 #define WINDOW_WIDTH 1200
@@ -53,17 +53,19 @@ void quit(DECK card[]);
 
 /*Global variables*/
 SDL_Surface* loadSurface(char* path); //Loads individual image
-SDL_Surface* table_img = NULL;        //Loaded converted image
+SDL_Surface* table_img = NULL;        //Loaded converted table image
+SDL_Surface* hit_img = NULL;          //Loaded converted hit button image
+SDL_Surface* stand_img = NULL;        //Loaded converted stand button image
+
 SDL_Window* window = NULL;            //The window
 SDL_Surface* screen = NULL;           // The window surface
-SDL_Event event;                      //Event- When user closes the window
+SDL_Event event;                      //Event- for user interaction
 _Bool running = true;                 // Game loop flag
 
-char table[50]="grafik/casino_v3.bmp";
+char table[50]="grafik/casino_v3.bmp",hit_button[50]="grafik/hit.bmp",stand_button[50]="grafik/stand.bmp";
+
 
 //************************************ MAIN *********************************************
-
-
 
 int main( int argc, char* args[] ) {
     srand(time(NULL));
@@ -73,41 +75,40 @@ int main( int argc, char* args[] ) {
     SDL_initializer();
     shuffleDeck(card);
 
+
     if (!loadMedia(card)){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
-    SDL_BlitSurface( table_img, NULL, screen, NULL ); // Draw the gametable to the screen
+
     game_running(card,usr); // game loop
 
  return 0;
 }
 //***************************************************************************************
+
 void deal_cards(PLAYER usr[],DECK card[]){
     int i=0,j=0;
     for(i=0;i<5;++i){
-        // Rectangles for positioning
+        // Rectangles for positioning (deal 1)
         card[i].CardPos.x=usr[j].x1;
         card[i].CardPos.y=usr[j].y1;
         card[i].CardPos.w=70;
         card[i].CardPos.h=106;
         SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
         ++j;
-        SDL_UpdateWindowSurface(window);
     }
     j=0;
         for(i=5;i<10;++i){
-        // Rectangles for positioning
+        // Rectangles for positioning (deal 2)
         card[i].CardPos.x=usr[j].x2;
         card[i].CardPos.y=usr[j].y2;
         card[i].CardPos.w=75;
         card[i].CardPos.h=111;
         SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
         ++j;
-        SDL_UpdateWindowSurface(window);
    }
-
-SDL_UpdateWindowSurface(window);
     //Update the surface
+    SDL_UpdateWindowSurface(window);
 
 }
 
@@ -171,7 +172,7 @@ SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32
 	}
 	else
 	{
-		//Convert surface to screen format
+		 /* ------ Convert the 24bit image to the optimized 32bit ------ */
 		optimizedSurface = SDL_ConvertSurface( loadedSurface, screen->format, SDL_SWSURFACE );
 		if( optimizedSurface == NULL )
 		{
@@ -191,9 +192,32 @@ bool loadMedia(DECK card[]){
     bool success = true;
     int i=0;
 
-    /* ------ Convert the 24bit image to the optimized 32bit ------ */
+    // ------------------------------ LOAD BUTTONS AND GAMEBOARD ---------------------------------
 
     table_img=loadSurface(table);
+    hit_img=loadSurface(hit_button);
+    stand_img=loadSurface(stand_button);
+
+    SDL_Rect    hit_Rect;
+    SDL_Rect    stand_Rect;
+
+    // Positions for hit button
+    hit_Rect.x=490;
+    hit_Rect.y=530;
+    hit_Rect.w=98;
+    hit_Rect.h=50;
+    // Positions for stand button
+    stand_Rect.x=610;
+    stand_Rect.y=530;
+    stand_Rect.w=98;
+    stand_Rect.h=50;
+    // Draw images to screen
+    SDL_BlitSurface(table_img, NULL, screen, NULL); // Gameboard
+    SDL_BlitScaled(hit_img, NULL, screen, &hit_Rect); // hit button
+    SDL_BlitScaled(stand_img, NULL, screen, &stand_Rect); // stand button
+
+    // ----------------------------------------------------------------------------------------------
+
     if( table_img == NULL ){
         printf( "Failed to load image!\n" );
         success = false;
@@ -304,17 +328,17 @@ void card_init(DECK card[], PLAYER usr[]){
     usr[0].x1=500; usr[0].y1=90;
     usr[0].x2=600; usr[0].y2=90;
     // Player 1
-    usr[1].x1=160; usr[1].y1=350;
-    usr[1].x2=240; usr[1].y2=350;
+    usr[1].x1=160; usr[1].y1=300;
+    usr[1].x2=240; usr[1].y2=300;
     //Player 2
-    usr[2].x1=380; usr[2].y1=400;
-    usr[2].x2=460; usr[2].y2=400;
+    usr[2].x1=380; usr[2].y1=350;
+    usr[2].x2=460; usr[2].y2=350;
     // Player 3
-    usr[3].x1=600; usr[3].y1=400;
-    usr[3].x2=680; usr[3].y2=400;
+    usr[3].x1=600; usr[3].y1=350;
+    usr[3].x2=680; usr[3].y2=350;
     // Player 4
-    usr[4].x1=840; usr[4].y1=350;
-    usr[4].x2=920; usr[4].y2=350;
+    usr[4].x1=840; usr[4].y1=300;
+    usr[4].x2=920; usr[4].y2=300;
 }
 
 
@@ -325,78 +349,11 @@ void quit(DECK card[]){
         SDL_FreeSurface(card[i].card_img);
     }
     SDL_FreeSurface(table_img); // Frigör bild för Black Jack bordet.
+    SDL_FreeSurface(hit_img); // Frigör bild för hit-knapp bordet.
+    SDL_FreeSurface(stand_img); // Frigör bild för stand-knapp bordet.
     SDL_DestroyWindow(window);  // Dödar fönstret
     SDL_Quit();
 }
 
 
 
-/*         DEMON        */
-
-static void daemonize(void){
-    pid_t pid, sid;
-    //already a daemon /
-    if ( getppid() == 1 ) return;
-    //Fork off the parent process /
-    pid = fork();
-    if (pid < 0) {
-        exit(EXIT_FAILURE);
-    }
-    // If we got a good PID, then we can exit the parent process. /
-    if (pid > 0) {
-        exit(EXIT_SUCCESS);
-    }
-    // At this point we are executing as the child process /
-    // Change the file mode mask /
-    umask(0);
-    // Create a new SID for the child process /
-
-    sid = setsid();
-    if (sid < 0) {
-        exit(EXIT_FAILURE);
-    }
-    // Change the current working directory.  This prevents the current
-      // directory from being locked; hence not being able to remove it.
-
-    pid = fork();
-    if(pid>0){
-        if ((chdir("/")) < 0) {
-            exit(EXIT_FAILURE);
-        }
-        // Redirect standard files to /dev/null
-        freopen( "/dev/null", "r", stdin);
-        freopen( "/dev/null", "w", stdout);
-        freopen( "/dev/null", "w", stderr);
-    }
-}
-
-
-/*      SERVERKOD
-int server(){
-    int server_socket, client_socket,consocket=0;
-    struct sockaddr_in serv, dest;
-    char msg[] = "Connected with server.\n";
-
-    //daemonize();
-
-    pid=getpid();
-    int listen_socket; // socket used to listen for incoming connections
-    socklen_t socksize = sizeof(struct sockaddr_in);
-    memset(&serv, 0, sizeof(serv));           // zero the struct before filling the fields
-    serv.sin_family = AF_INET;                // set the type of connection to TCP/IP
-    serv.sin_addr.s_addr = htonl(INADDR_ANY); // set our address to any interface
-    serv.sin_port = htons(PORTNUM);
-    listen_socket = socket(AF_INET, SOCK_STREAM, 0);
-    bind(listen_socket, (struct sockaddr *)&serv, sizeof(struct sockaddr));
-    listen(listen_socket, 5);
-
-
-    printf("Incoming connection from %s - sending welcome\n", inet_ntoa(dest.sin_addr));
-
-    send(consocket, msg, strlen(msg), 0);
-    consocket = accept(listen_socket, (struct sockaddr *)&dest, &socksize);
-
-
-    // Nu finns de en anslutning, och nedan kan kod för kommunikationen över socketen finnas.
-}
-    */
