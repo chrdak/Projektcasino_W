@@ -15,6 +15,8 @@
 #include <assert.h>
 #include <netinet/in.h>
 #include "lib/server.h"
+#include <pthread.h>
+#include <signal.h>
 
 #define PORTNUM 25780
 #define SOCK_PATH "Casino_socket"
@@ -27,31 +29,45 @@
 
 struct card{
     char path[100];
-    int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
+    int type;       //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
     int game_value;
     int real_value;
     SDL_Surface* card_img;
     SDL_Rect CardPos;
 };
-typedef struct card DECK;
 
 struct player_pos_value{
-    int score, x1, y1,x2,y2;
-    DECK hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om tilldelade kort, färg, värden..
-};                 // Plats [0] är första tilldelade kortet osv.
-typedef struct player_pos_value PLAYER;
+    int score, x1, y1,x2,y2;    // element [0] is the first given card osv.
+    DECK hand[11]; // Array that represents a players "hand", every element contains  information about given cards, color, values..
+};
 
-/*FUNKTIONS PROTOTYPER*/
-bool loadMedia(DECK card[]); // Function for loading images unconverted
+struct server_threads{
+    DECK tdeck;  // thread_deck
+    PLAYER tplayer; // thread_player
+    int nthread;
+    int tconsocket; // the threads own connectionsocket
+
+};
+
+typedef struct card DECK;
+typedef struct player_pos_value PLAYER;
+struct server_threads THREAD;
+
+
+/*FUNCTION PROTOTYPES*/
+bool loadMedia(DECK card[]);               // Function for loading images unconverted
 void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
 void SDL_initializer();
 void game_running(DECK card[],PLAYER usr[]);
 void shuffleDeck(DECK card[]);
 void deal_cards(PLAYER usr[],DECK card[]);
 void quit(DECK card[]);
+int server(DECK card[], PLAYER usr[]);
+void* serve_client (void* parameters);    // thread function
 //-------------------------------------------------
 
 /*Global variables*/
+pthread_mutex_t mutex[5];             // An global array of 5 mutexes
 SDL_Surface* loadSurface(char* path); //Loads individual image
 SDL_Surface* table_img = NULL;        //Loaded converted table image
 SDL_Surface* hit_img = NULL;          //Loaded converted hit button image
@@ -69,14 +85,14 @@ char table[50]="grafik/casino_v3.bmp",hit_button[50]="grafik/hit.bmp",stand_butt
 
 int main( int argc, char* args[] ) {
     srand(time(NULL));
-    DECK card[60];      // struct array (path,type,game_value)
+    DECK card[60];          // struct array (path,type,game_value)
     PLAYER usr[5];
     card_init(card,usr);
     SDL_initializer();
     shuffleDeck(card);
 
 
-    if (!loadMedia(card)){ // Calling function for loading 24-bit images in to the memory
+    if (!loadMedia(card)){  // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
 
@@ -162,7 +178,7 @@ void SDL_initializer(){
 
 SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32bit
 	//The final optimized image
-	SDL_Surface* optimizedSurface = NULL; // Här lagras den optimerade 32bitars bilden
+	SDL_Surface* optimizedSurface = NULL; // The optimised 32-bit images is stored here
 
 	//Load image at specified path
 	SDL_Surface* loadedSurface = SDL_LoadBMP(path);
@@ -180,7 +196,7 @@ SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32
 		}
 
 		//Get rid of old loaded surface
-		SDL_FreeSurface( loadedSurface ); // Släng 24-bit
+		SDL_FreeSurface( loadedSurface ); // free/deallocate 24-bit image
 	}
 
 	return optimizedSurface;
@@ -317,7 +333,7 @@ void card_init(DECK card[], PLAYER usr[]){
     // ------------------------------------------
 
 
-    // Black Jack-värde och riktigt värde för alla Ess
+    // Black Jack-value and "real" for all Ess
     card[1].game_value=11;card[1].real_value=14;
     card[14].game_value=11;card[14].real_value=14;
     card[27].game_value=11;card[27].real_value=14;
