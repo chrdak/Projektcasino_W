@@ -43,9 +43,10 @@ struct player_pos_value{
 
 struct server_threads{
     DECK tdeck;  // thread_deck
-    PLAYER tplayer; // thread_player
+    PLAYER tplayer; // thread_player_position_value
     int nthread;
-    int tconsocket; // the threads own connectionsocket
+    int n_users;  // the number of users currently connected
+    int tconsocket[5]; // the threads own connectionsocket
 
 };
 
@@ -370,6 +371,5 @@ void quit(DECK card[]){
     SDL_DestroyWindow(window);  // Dödar fönstret
     SDL_Quit();
 }
-
 
 
