@@ -1,4 +1,4 @@
-/      SERVERKOD
+ /     SERVERKOD
 int server(DECK card[], PLAYER usr[])
 {
     int server_socket, client_socket,consocket=0, i;
@@ -25,7 +25,7 @@ int server(DECK card[], PLAYER usr[])
     serv.sin_port = htons(PORTNUM);
     listen_socket = socket(AF_INET, SOCK_STREAM, 0);
     bind(listen_socket, (struct sockaddr *)&serv, sizeof(struct sockaddr));
-    listen(listen_socket, 5);
+    listen(listen_socket, 4); // a maximum of 4 connections simultaniously can be  made
 
 
     printf("Incoming connection from %s - sending welcome\n", inet_ntoa(dest.sin_addr));
@@ -41,25 +41,63 @@ int server(DECK card[], PLAYER usr[])
 
         //Dealer initilization: The dealer will have a separate thread without the need of an client
         if(i==0){
-            tdata[i].tconsocket = consocket;
-            tdata[i].nthread = i;
-            pthread_create(&thread_id[i], NULL, &serve_client, &tdata[i]);
+            tdata[0].tconsocket[0] = consocket;
+            tdata[0].nthread = 0;
+            pthread_create(&thread_id[0], NULL, &serve_client, &tdata[0]);
             i++;
         }
-        // Each individual client will be servered by a thread.
-        tdata[i].tconsocket = consocket;
+        // Each individual client will be servered by a thread.     // Problem: Dealer och användare1 delar på samma socket
+        tdata[0].tconsocket[i] = consocket;
+        tdata[0].n_users = i;  // the number of users currently connected must be known to thread[0]/Dealer
         tdata[i].nthread = i;
         pthread_create(&thread_id[i], NULL, &serve_client, &tdata[i]);
         i++;
     }
 
 
-    // Nu finns de en anslutning, och nedan kan kod för kommunikationen över socketen finnas.
+
 }
     /
 
 void* serve_client (void* parameters) {  //thread_function
 
     THREAD* p = (THREAD*) parameters;
-}
 
+    switch(p->nthread) {
+        case 0: { // Dealer
+
+            pthread_mutex_lock(&mutex[p->nthread]);
+            // The number of users playing must be known to the dealer (n_users), if there are no users -> return to main(?)
+            // which user is going to play against the dealer?, other users  must wait and will need to be notified by the dealer
+            // Send information to the client -> forward the answer to the specific thread and wait for the threads answer
+            // Make Calculations based on the answer from the thread. Compare it with your own values.
+            //  Send the necessary values back to the client/clients
+            //  Loop
+        }
+        case 1: { // Threadfunction1/ user1
+
+            pthread_mutex_lock(&mutex[p->nthread]);
+            // Stay in a loop and wait for the dealer to make contact.
+            // Based  on the information ->(waiting for turn): only make changes to your surroundings and loop, your turn: calculate game vaules,and send to dealer and loop
+            // (user has exited): Reset all your values, notify the server that the slot is empty(setting i == p->nthread) and unlock your mutex -> Return to main
+
+        }
+        case 2: { // Threadfunction2/ user2
+
+            pthread_mutex_lock(&mutex[p->nthread]);
+        }
+        case 3: { // Threadfunction3/ user3
+
+            pthread_mutex_lock(&mutex[p->nthread]);
+        }
+        case 4: { // Threadfunction4/ user4
+
+            pthread_mutex_lock(&mutex[p->nthread]);
+        }
+        default: { // Maximum number of users has been reached!
+
+        }
+
+    }
+
+}
