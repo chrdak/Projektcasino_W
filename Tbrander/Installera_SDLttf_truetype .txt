@@ -1,0 +1,34 @@
+Ladda ner freetype-2.5.3.tar.bz2:
+
+http://download.savannah.gnu.org/releases/freetype/
+
+Gå till mappen och ange följande kommandon:
+
+tar -xvf freetype-2.5.3.tar.bz2
+
+gå in i nya mappen som heter "freetype-2.5.3"
+
+./configure
+make
+make install
+
+
+
+Ladda ner SDL2_ttf-2.0.12.tar.gz :
+
+https://www.libsdl.org/projects/SDL_ttf/
+
+Gå till mappen och ange följande kommandon:
+
+tar -xvf SDL2_ttf-2.0.12.tar.gz
+
+gå in i nya mappen som heter "SDL2_ttf-2.0.12"
+
+./configure
+make
+make install
+---------------------------------------------
+
+Kompilera med: 
+
+gcc main.c -o filnamn -lSDL2 -lSDL2_ttf
