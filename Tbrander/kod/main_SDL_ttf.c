@@ -15,8 +15,9 @@
 #include <assert.h>
 #include <netinet/in.h>
 #include "lib/server.h"
-#include <pthread.h>
-#include <signal.h>
+
+#include <SDL2/SDL_ttf.h>
+
 
 #define PORTNUM 25780
 #define SOCK_PATH "Casino_socket"
@@ -26,56 +27,42 @@
 
 // --------------------------------------------------------------------------------------------------
 
-
 struct card{
     char path[100];
-    int type;       //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
+    int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
     int game_value;
     int real_value;
     SDL_Surface* card_img;
     SDL_Rect CardPos;
 };
+typedef struct card DECK;
 
 struct player_pos_value{
-    int score, x1, y1,x2,y2;    // element [0] is the first given card osv.
-    DECK hand[11]; // Array that represents a players "hand", every element contains  information about given cards, color, values..
-};
-
-struct server_threads{
-    DECK tdeck;  // thread_deck
-    PLAYER tplayer; // thread_player_position_value
-    int nthread;
-    int n_users;  // the number of users currently connected
-    int tconsocket[5]; // the threads own connectionsocket
-
-};
-
-typedef struct card DECK;
+    int score, x1, y1,x2,y2;
+    DECK hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om tilldelade kort, färg, värden..
+};                 // Plats [0] är första tilldelade kortet osv.
 typedef struct player_pos_value PLAYER;
-struct server_threads THREAD;
 
-
-/*FUNCTION PROTOTYPES*/
-bool loadMedia(DECK card[]);               // Function for loading images unconverted
+/*FUNKTIONS PROTOTYPER*/
+bool loadMedia(DECK card[]); // Function for loading images unconverted
 void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
 void SDL_initializer();
 void game_running(DECK card[],PLAYER usr[]);
 void shuffleDeck(DECK card[]);
 void deal_cards(PLAYER usr[],DECK card[]);
 void quit(DECK card[]);
-int server(DECK card[], PLAYER usr[]);
-void* serve_client (void* parameters);    // thread function
+void display_text(PLAYER usr[],DECK card[],int);
 //-------------------------------------------------
 
 /*Global variables*/
-pthread_mutex_t mutex[5];             // An global array of 5 mutexes
 SDL_Surface* loadSurface(char* path); //Loads individual image
 SDL_Surface* table_img = NULL;        //Loaded converted table image
 SDL_Surface* hit_img = NULL;          //Loaded converted hit button image
 SDL_Surface* stand_img = NULL;        //Loaded converted stand button image
-
+TTF_Font *font;                       // True type font to be loaded (*.ttf)
 SDL_Window* window = NULL;            //The window
 SDL_Surface* screen = NULL;           // The window surface
+SDL_Surface *text;                    // Score to be printed
 SDL_Event event;                      //Event- for user interaction
 _Bool running = true;                 // Game loop flag
 
@@ -86,53 +73,76 @@ char table[50]="grafik/casino_v3.bmp",hit_button[50]="grafik/hit.bmp",stand_butt
 
 int main( int argc, char* args[] ) {
     srand(time(NULL));
-    DECK card[60];          // struct array (path,type,game_value)
+    DECK card[60];      // struct array (path,type,game_value)
     PLAYER usr[5];
     card_init(card,usr);
     SDL_initializer();
     shuffleDeck(card);
 
 
-    if (!loadMedia(card)){  // Calling function for loading 24-bit images in to the memory
+    if (!loadMedia(card)){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
-
+    deal_cards(usr,card);
     game_running(card,usr); // game loop
 
  return 0;
 }
 //***************************************************************************************
 
+void display_text(PLAYER usr[],DECK card[],int playerNr){
+
+    int xPos=usr[playerNr].x1,yPos=usr[playerNr].y1+120; // Every users position stored in xPos, yPos
+    char scoreToDisplay[10]={0};
+    snprintf(scoreToDisplay,10,"Sum: %d",usr[playerNr].score); // Translate int to string, storing it in scoreToDisplay
+    TTF_Init(); // Initialize SDL_ttf
+    font = TTF_OpenFont("fonts/DejaVuSans.ttf", 16); // Open true type font
+    SDL_Color text_color = {255, 245, 0};
+    text = TTF_RenderText_Blended(font,scoreToDisplay,text_color); // Blended = smoother edges, Solid = sharper edges
+
+    SDL_Rect textLocation = { xPos,yPos, 0, 0 }; // Position of text, relativ to user
+    SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
+    // Free text
+    SDL_FreeSurface(text);
+    //Close the font
+    TTF_CloseFont(font);
+}
+
 void deal_cards(PLAYER usr[],DECK card[]){
-    int i=0,j=0;
-    for(i=0;i<5;++i){
+    int i=0,playerNr=0;
+    for(i=0;i<5;++i){ // 5 = Number of users inc dealer
         // Rectangles for positioning (deal 1)
-        card[i].CardPos.x=usr[j].x1;
-        card[i].CardPos.y=usr[j].y1;
+        card[i].CardPos.x=usr[playerNr].x1;
+        card[i].CardPos.y=usr[playerNr].y1;
         card[i].CardPos.w=70;
         card[i].CardPos.h=106;
+        usr[playerNr].score+=card[i].game_value;
         SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
-        ++j;
+        ++playerNr;
     }
-    j=0;
-        for(i=5;i<10;++i){
+    playerNr=0;
+        for(i=5;i<10;++i){// 5 = Number of users inc dealer
         // Rectangles for positioning (deal 2)
-        card[i].CardPos.x=usr[j].x2;
-        card[i].CardPos.y=usr[j].y2;
+        card[i].CardPos.x=usr[playerNr].x2;
+        card[i].CardPos.y=usr[playerNr].y2;
         card[i].CardPos.w=75;
         card[i].CardPos.h=111;
+        usr[playerNr].score+=card[i].game_value;
         SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
-        ++j;
+        display_text(usr,card,playerNr);// Call display_score
+        ++playerNr;
    }
+
     //Update the surface
     SDL_UpdateWindowSurface(window);
 
 }
 
 void game_running(DECK card[],PLAYER usr[]){
+
     while(running){
-        deal_cards(usr,card);
-        sleep(2);
+
+        sleep(1);
         while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
           {
              if( event.type == SDL_QUIT ){
@@ -154,7 +164,6 @@ void shuffleDeck(DECK card[]){
         card[j]=tmp[i];
     }
 }
-
 
 void SDL_initializer(){
 
@@ -179,7 +188,7 @@ void SDL_initializer(){
 
 SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32bit
 	//The final optimized image
-	SDL_Surface* optimizedSurface = NULL; // The optimised 32-bit images is stored here
+	SDL_Surface* optimizedSurface = NULL; // Här lagras den optimerade 32bitars bilden
 
 	//Load image at specified path
 	SDL_Surface* loadedSurface = SDL_LoadBMP(path);
@@ -197,7 +206,7 @@ SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32
 		}
 
 		//Get rid of old loaded surface
-		SDL_FreeSurface( loadedSurface ); // free/deallocate 24-bit image
+		SDL_FreeSurface( loadedSurface ); // Släng 24-bit
 	}
 
 	return optimizedSurface;
@@ -334,7 +343,7 @@ void card_init(DECK card[], PLAYER usr[]){
     // ------------------------------------------
 
 
-    // Black Jack-value and "real" for all Ess
+    // Black Jack-värde och riktigt värde för alla Ess
     card[1].game_value=11;card[1].real_value=14;
     card[14].game_value=11;card[14].real_value=14;
     card[27].game_value=11;card[27].real_value=14;
@@ -361,6 +370,8 @@ void card_init(DECK card[], PLAYER usr[]){
 
 void quit(DECK card[]){
     int i;
+    //Quit SDL_ttf
+    TTF_Quit();
     // Frigör bilder för spelkorten.
     for (i=0;i<53;++i){
         SDL_FreeSurface(card[i].card_img);
@@ -371,5 +382,6 @@ void quit(DECK card[]){
     SDL_DestroyWindow(window);  // Dödar fönstret
     SDL_Quit();
 }
+
 
 
