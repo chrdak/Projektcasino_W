@@ -1,18 +1,13 @@
 #include <SDL2/SDL.h>
 #include <SDL/SDL.h>
+#include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
+#include <SDL2/SDL_test_font.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-
-#include<X11/X.h>
-#include<X11/Xlib.h>
-#include<GL/gl.h>
-#include<GL/glx.h>
-#include<GL/glu.h>
-
-
 
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 600
@@ -40,6 +35,10 @@ void SDL_initializer();
 void game_running(DECK card[],PLAYER usr[]);
 void shuffleDeck(DECK card[]);
 void deal_cards(PLAYER usr[],DECK card[]);
+
+
+int j = 0; // dealer counter for card in hand
+int k = 0; // player counter for card in hand
 //-------------------------------------------------
 
 /*Global variables*/
@@ -51,7 +50,7 @@ SDL_Surface* screen = NULL;           // The window surface
 SDL_Event event;                      //Event- When user closes the window
 _Bool running = true;                 // Game loop flag
 
-char table[50]="grafik/casino_v2.bmp";
+char table[50]="grafik/casino_v3.bmp";
 
 //************************************ MAIN *********************************************
 
@@ -81,8 +80,8 @@ int main( int argc, char* args[] ) {
 //*************************************************************************************
 void deal_cards(PLAYER usr[],DECK card[]){
     int i=0,dealerx=500,dealery=100, playerx=915, playery=390; // card positions on screen
-    int j = 0; // dealer counter for card in hand
-    int k = 0; // player counter for card in hand
+    j = 0; // dealer counter for card in hand
+    k = 0; // player counter for card in hand
      usr[0].score = 0;
      usr[1].score = 0;
     for(i=1;i<4;i++){
@@ -138,12 +137,13 @@ void game_running(DECK card[],PLAYER usr[]){
     int x = 0; //x position
     int y = 0; //y position
     int i = 3; // start value for next card
-    int j = 1;
-    int k = 2; // player hand count
+    //int j = 1;
+    //int k = 2; // player hand count
     int l = 0;
     int hand[20]; // hand value storage
     int stop = 0; // boolean value
     int playerx=939, playery=414, dealerx=512,dealery=112; // card position on screen
+    int newGame = 0;
     //button hit
     SDL_Rect rect;
     rect.x = 550;
@@ -175,12 +175,56 @@ void game_running(DECK card[],PLAYER usr[]){
     while(running){
 
 
-        if(stop == 0){
+        if(stop == 0 && usr[1].score < 21){
 
                 SDL_FillRect(screen,&rect,color);
                 SDL_FillRect(screen,&rect2,color2);
 
         }
+
+        if(usr[1].score == 21) {
+
+            while(usr[0].score < 17 && stop == 0) {
+                if(i>52) {
+                    shuffleDeck(card);
+                    i=1;
+                }
+                card[i].CardPos.x= dealerx;
+                card[i].CardPos.y= dealery;
+                card[i].CardPos.w=75;
+                card[i].CardPos.h=111;
+                dealerx += 12;
+                dealery += 12;
+
+                usr[0].hand[j] = card[i].value; // stores current card value in postion j of hand array
+                ++j;
+
+                usr[0].score +=card[i].value;
+
+                if(usr[0].score > 21) { // if current score is greater than 21
+                    for(l=0;l<j+1;l++){ //if current hand has card equal to 11 and player score is greater than 21
+                        if(usr[0].hand[l] == 11 && usr[0].score > 21){
+                            usr[0].score -= 10; // decrement total score with 10
+                            usr[0].hand[l] = 1; // ace in hand gets the value 1
+                        }
+
+                    }
+                }
+
+
+                SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
+                ++i;
+
+                if(usr[0].score > 16) { // set boolean value if dealer have more than 16
+                    stop = 1;
+
+                }
+                printf("Dealer: %d\n",usr[0].score );
+                            //SDL_Delay(100);
+                }
+                newGame = 1;
+        }
+
         if(stop == 1) {//Rules for player win
                 if(usr[1].score > usr[0].score && usr[1].score < 22 || usr[0].score > 21 ) {
                                 SDL_FillRect(screen,&rect3,color);
@@ -223,7 +267,7 @@ void game_running(DECK card[],PLAYER usr[]){
                     x = event.button.x;
                     y = event.button.y;
 
-                    if(x>rect.x && x< rect.x+rect.w && y>rect.y && y<rect.y+rect.h) {
+                    if(x>rect.x && x< rect.x+rect.w && y>rect.y && y<rect.y+rect.h && usr[1].score < 21 && newGame == 0) {
                         if(i>52) {
                             shuffleDeck(card); // shuffle deck and start next card in position 1
                             i=1;
@@ -257,10 +301,13 @@ void game_running(DECK card[],PLAYER usr[]){
                            }
                         }
 
+
                         if(usr[1].score > 21) {
                             stop = 1; // boolean value
+                            newGame = 1;
                         }
                         SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
+
                         ++i;
                         printf("Player: %d\n",usr[1].score );
 
@@ -281,8 +328,24 @@ void game_running(DECK card[],PLAYER usr[]){
                             dealerx += 12;
                             dealery += 12;
 
+                             usr[0].hand[j] = card[i].value; // stores current card value in postion j of hand array
+                                ++j;
+
+
 
                             usr[0].score +=card[i].value;
+
+                             if(usr[0].score > 21) { // if current score is greater than 21
+                                for(l=0;l<j+1;l++){ //if current hand has card equal to 11 and player score is greater than 21
+                                    if(usr[0].hand[l] == 11 && usr[0].score > 21){
+                                        usr[0].score -= 10; // decrement total score with 10
+                                        usr[0].hand[l] = 1; // ace in hand gets the value 1
+                                    }
+
+                                }
+                            }
+
+
                             SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);// Draw card image to screen and scale
                             ++i;
 
@@ -293,9 +356,10 @@ void game_running(DECK card[],PLAYER usr[]){
                             printf("Dealer: %d\n",usr[0].score );
                             //SDL_Delay(100);
                         }
+                        newGame = 1;
                     }
 
-                    if(x>rect4.x && x< rect4.x+rect4.w && y>rect4.y && y<rect4.y+rect4.h) {
+                    if(x>rect4.x && x< rect4.x+rect4.w && y>rect4.y && y<rect4.y+rect4.h && newGame == 1) {
 
                         //new game button on upper left corner
                         SDL_BlitSurface( table_img, NULL, screen, NULL );
@@ -306,9 +370,10 @@ void game_running(DECK card[],PLAYER usr[]){
                         dealerx=512;
                         dealery=112;
 
-                        int j = 1;
-                        int k = 2;
 
+                        //int j = 1;
+                        //int k = 2;
+                        newGame = 0;
                         stop = 0;
 
                     }
