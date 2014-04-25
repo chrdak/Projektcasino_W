@@ -1,3 +1,4 @@
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
@@ -15,13 +16,54 @@
 #include <sys/un.h>
 #include <assert.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include "lib/server.h"
+#include <assert.h>
 
-#define PORTNUM 25780
+#define PORTNUM 6578
 #define SOCK_PATH "Casino_socket"
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 600
 #define WINDOW_TITLE "Projekt Casino"
+
+// --------------------------------------------------------------------------------------------------
+
+struct card{
+    char path[100];
+    int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
+    int game_value;
+    int real_value;
+    SDL_Surface* card_img;
+    SDL_Rect CardPos;
+};
+typedef struct card DECK;
+
+struct player_pos_value{
+    int score, x1, y1,x2,y2,bet,tot_holding;
+    DECK hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om tilldelade kort, färg, värden..
+};                 // Plats [0] är första tilldelade kortet osv.
+typedef struct player_pos_value PLAYER;
+
+struct server_threads{
+    DECK tdeck;  // thread_deck
+    PLAYER tplayer; // thread_player_position_value
+    int nthread;
+    int n_users;  // the number of users currently connected
+    int tconsocket[5]; // the threads own connectionsocket
+};
+typedef struct server_threads THREAD;
+
+
+/*FUNKTIONS PROTOTYPER*/
+bool loadMedia(DECK card[]); // Function for loading images unconverted
+void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
+void SDL_initializer();
+void game_running(DECK card[],PLAYER usr[]);
+void shuffleDeck(DECK card[]);
+void quit(DECK card[]);
+void display_text(PLAYER usr[],DECK card[],int);
+void connect_to_server();//prototyp
+//-------------------------------------------------
 
 /*Global variables*/
 SDL_Surface* loadSurface(char* path); //Loads individual image
@@ -34,95 +76,28 @@ SDL_Surface* screen = NULL;           // The window surface
 SDL_Surface *text;                    // Score to be printed
 SDL_Event event;                      //Event- for user interaction
 _Bool running = true;                 // Game loop flag
+int client_socket; // global
 char table[50]="grafik/casino_v3.bmp",hit_button[50]="grafik/hit.bmp",stand_button[50]="grafik/stand.bmp";
-int client_socket;
+int test;
 
+//************************************ MAIN *********************************************
 
-// Struct
-struct card{
-    char path[100];
-    int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
-    int game_value;
-    int real_value;
-    SDL_Surface* card_img;
-    SDL_Rect CardPos;
-};
-typedef struct card DECK;
-
-
-struct player_pos_value{
-    int score, x1, y1,x2,y2,bet,tot_holding;
-    DECK hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om tilldelade kort, färg, värden..
-};                 // Plats [0] är första tilldelade kortet osv.
-typedef struct player_pos_value PLAYER;
-
-
-/*FUNKTIONS PROTOTYPER*/
-bool loadMedia(DECK card[]); // Function for loading images unconverted
-void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
-void SDL_initializer();
-void game_running(DECK card[],PLAYER usr[]);
-void quit(DECK card[]);
-void display_text(PLAYER usr[],DECK card[],int);
-void connect_to_server();
-
-int main(void)
-{
+int main( int argc, char* args[] ) {
     connect_to_server();
-    DECK card[60];
-    PLAYER usr[5];
-    card_init(card,usr);
-    SDL_initializer();
-
+    srand(time(NULL)); // Server
+    DECK card[60];     // Klient, server
+    PLAYER usr[5];     // Klient, server
+    card_init(card,usr); // // Klient, server
+    SDL_initializer(); // klient
+    shuffleDeck(card); // Server
     if (!loadMedia(card)){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
     game_running(card,usr); // game loop
 
-    return 0;
-
+ return 0;
 }
-
-void connect_to_server(){
-
-    int mess_len;
-    char buffer[1000]; /* +1 so we can add null terminator */
-    struct sockaddr_in dest;
-    client_socket = socket(AF_INET, SOCK_STREAM, 0);
-
-    memset(&dest, 0, sizeof(dest));                /* zero the struct */
-    dest.sin_family = AF_INET;
-    dest.sin_addr.s_addr = inet_addr("10.0.2.15"); /* set destination IP number */
-    //dest.sin_addr.s_addr = htonl(INADDR_LOOPBACK); /* set destination IP number - localhost, 127.0.0.1*/
-    dest.sin_port = htons(PORTNUM);                /* set destination port number */
-
-    connect(client_socket, (struct sockaddr *)&dest, sizeof(struct sockaddr));
-    mess_len = recv(client_socket, buffer, 1000, 0);
-
-    /* We have to null terminate the received data ourselves */
-    buffer[mess_len] = '\0';
-
-    printf("Received %s (%d bytes).\n", buffer, mess_len);
-    printf("Connected.\n");
-
-
-}
-
-
-void game_running(DECK card[],PLAYER usr[]){
-
-    while(running){
-
-        sleep(1);
-        while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
-          {
-             if( event.type == SDL_QUIT ){
-                running = false; // Gameloop flag false
-                quit(card);
-             }
-          }
-     }
-}
+//***************************************************************************************
 
 void display_text(PLAYER usr[],DECK card[],int playerNr){
 
@@ -140,6 +115,55 @@ void display_text(PLAYER usr[],DECK card[],int playerNr){
     SDL_FreeSurface(text);
     //Close the font
     TTF_CloseFont(font);
+}
+
+void game_running(DECK card[],PLAYER usr[]){
+
+    while(running){
+
+        while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
+          {
+             if( event.type == SDL_QUIT ){
+                running = false; // Gameloop flag false
+                quit(card);
+                exit(0);
+             }
+          }
+     }
+}
+
+void shuffleDeck(DECK card[]){
+    int i,j;
+    DECK tmp[60];
+    for (i=1; i<53;++i){
+        j= rand()%52+1;
+        tmp[i]=card[i];
+        card[i]=card[j];
+        card[j]=tmp[i];
+    }
+}
+
+void connect_to_server(){
+
+    int mess_len;
+    char buffer[100]="Not connected!";
+    struct sockaddr_in dest;
+    client_socket = socket(AF_INET, SOCK_STREAM, 0); assert(client_socket!=-1);
+
+    memset(&dest, 0, sizeof(dest));                /* zero the struct */
+    dest.sin_family = AF_INET;
+    dest.sin_addr.s_addr = inet_addr("192.168.0.30"); /* set destination IP number */
+    //dest.sin_addr.s_addr = htonl(INADDR_LOOPBACK); /* set destination IP number - localhost, 127.0.0.1*/
+    dest.sin_port = htons(PORTNUM);                /* set destination port number */
+
+    test=connect(client_socket, (struct sockaddr *)&dest, sizeof(struct sockaddr));   assert(test==0);
+    mess_len = recv(client_socket, buffer, 100,0);
+
+    /* We have to null terminate the received data ourselves */
+    buffer[mess_len] = '\0';
+
+    printf("\nReceived: %s (%d bytes).\n", buffer, mess_len);
+
 }
 
 void SDL_initializer(){
@@ -189,6 +213,7 @@ SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32
 	return optimizedSurface;
 }
 
+
 bool loadMedia(DECK card[]){
     //Loading success flag
     bool success = true;
@@ -232,8 +257,10 @@ bool loadMedia(DECK card[]){
             success = false;
         }
     }
+    SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
     return success;
 }
+
 
 void card_init(DECK card[], PLAYER usr[]){
     int i=0,j=1,h=10;
@@ -342,6 +369,7 @@ void card_init(DECK card[], PLAYER usr[]){
     usr[4].x2=920; usr[4].y2=300;
 }
 
+
 void quit(DECK card[]){
     int i;
     //Quit SDL_ttf
@@ -356,5 +384,6 @@ void quit(DECK card[]){
     SDL_DestroyWindow(window);  // Dödar fönstret
     SDL_Quit();
 }
+
 
 

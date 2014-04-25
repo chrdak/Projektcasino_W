@@ -17,8 +17,9 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include "lib/server.h"
+#include <assert.h>
 
-#define PORTNUM 25780
+#define PORTNUM 6578
 #define SOCK_PATH "Casino_socket"
 
 // --------------------------------------------------------------------------------------------------
@@ -61,7 +62,8 @@ int server(DECK card[], PLAYER usr[]);
 
 /*Global variables*/
 pthread_mutex_t mutex[5];             // An global array of 5 mutexes
-
+int consocket;
+int test;
 //************************************ MAIN *********************************************
 
 int main( int argc, char* args[] ) {
@@ -70,8 +72,9 @@ int main( int argc, char* args[] ) {
     DECK card[60];     // Klient, server
     PLAYER usr[5];     // Klient, server
     card_init(card,usr); // // Klient, server
-    shuffleDeck(card); // Server
-    deal_cards(usr,card);
+    //shuffleDeck(card); // Server
+    //deal_cards(usr,card);
+    server(card,usr);
     game_running(card,usr); // game loop
  return 0;
 }
@@ -101,8 +104,11 @@ void deal_cards(PLAYER usr[],DECK card[]){
 }
 
 void game_running(DECK card[],PLAYER usr[]){
-
-
+    char str[1000];
+    while(1){
+        recv(consocket,str,100,0);
+        printf("%s\n",str);
+    }
 }
 
 void shuffleDeck(DECK card[]){
@@ -116,8 +122,41 @@ void shuffleDeck(DECK card[]){
     }
 }
 
+void card_init(DECK card [], PLAYER usr[]){
+    int i;
+    int gameValue = 1;
+    int realValue = 1;
 
-void card_init(DECK card[], PLAYER usr[]){
+    for (i=0;i<54;++i){
+        sprintf(card[i].path,"grafik/cards/%d.bmp",i);
+        if(i > 1 && i < 10 || i > 14 && i < 23 || i > 27 && i < 36 || i > 40 && i < 49){ // all cards between 2 and 9
+            card[i].game_value=gameValue;
+            card[i].real_value=realValue;
+            card[i].type=i/13 +1;
+        }
+
+        if (i>9 && i<14 || i>22 && i<27 || i>35 && i<40 || i>48 && i<53){ // All tens, jacks, queens and kings equal 10
+            card[i].game_value = 10;
+            card[i].real_value = realValue;
+            card[i].type=i/14 +1;
+        }
+
+        if (i==1 || i==14 || i==27 || i==40){ // ACE:s
+            card[i].game_value=11;
+            card[i].type=i/13 +1;
+            gameValue = 1;
+            realValue = 1;
+            card[i].real_value=1;
+        }
+
+        ++realValue;
+        ++gameValue;
+        card[53].real_value=0;card[53].type=0;card[53].game_value=0;
+        printf(" Real Value = %d    Type = %d    Value = %d      Path = %s \n ",card[i].real_value,card[i].type,card[i].game_value, card[i].path);
+    }
+}
+
+void card_init2(DECK card[], PLAYER usr[]){
     int i=0,j=1,h=10;
     char tmp[5];
     for (i=0;i<54;++i){
@@ -126,7 +165,6 @@ void card_init(DECK card[], PLAYER usr[]){
         strcat(card[i].path,tmp);
         strcat(card[i].path,".bmp");
     }
-
     card[0].game_value=0; card[0].type=0; // Value and type for the back piece (blue)
     card[53].game_value=0; card[53].type=0; // Value and type for the back piece (red)
 
@@ -227,7 +265,7 @@ void card_init(DECK card[], PLAYER usr[]){
 
 /*    SERVERKOD   */
 int server(DECK card[], PLAYER usr[]) {
-    int server_socket,consocket=0, i;
+    int server_socket,i;
     int listen_socket; // socket used to listen for incoming connections
     struct sockaddr_in serv, dest;
     char msg[] = "Connected with server.\n";
@@ -249,21 +287,20 @@ int server(DECK card[], PLAYER usr[]) {
     serv.sin_family = AF_INET;                // set the type of connection to TCP/IP
     serv.sin_addr.s_addr = htonl(INADDR_ANY); // set our address to any interface
     serv.sin_port = htons(PORTNUM);
-    listen_socket = socket(AF_INET, SOCK_STREAM, 0);
-    bind(listen_socket, (struct sockaddr *)&serv, sizeof(struct sockaddr));
-    listen(listen_socket, 4); // a maximum of 4 connections simultaniously can be  made
+    listen_socket = socket(AF_INET, SOCK_STREAM, 0); assert(listen_socket!=-1);
+    test=bind(listen_socket, (struct sockaddr *)&serv, sizeof(struct sockaddr)); assert(test==0);
+    test=listen(listen_socket, 4); assert(test==0); // a maximum of 4 connections simultaniously can be  made
 
-    printf("Incoming connection from %s - sending welcome\n", inet_ntoa(dest.sin_addr));
-
-    send(consocket, msg, strlen(msg), 0);
 
     //Main-Accept loop
     while(1) {
-
         consocket = accept(listen_socket, (struct sockaddr *)&dest, &socksize);
-        if(consocket != -1) {  // if accept fails to initialize conection -> return value == -1
+        if(consocket == -1) {  // if accept fails to initialize connection -> return value == -1
             continue;
         }
+        printf("Incoming connection from %s - sending welcome\n", inet_ntoa(dest.sin_addr));
+        send(consocket, msg, strlen(msg), 0);
+
         //Dealer initilization: The dealer will have a separate thread without the need of an client
         if(i==0){
             tdata[0].tconsocket[0] = consocket;
@@ -279,14 +316,15 @@ int server(DECK card[], PLAYER usr[]) {
       //  pthread_create(&filosof[i], NULL, &philosophize, (void *)&filosof_info[i]); // Skapar nya trådar och ger dem rätt nr
         i++;
     }
+
 }
+
 
 void* serve_client (void* parameters) {  //thread_function
 
     THREAD* p = (THREAD*) parameters;
     switch(p->nthread) {
         case 0: { // Dealer
-
             pthread_mutex_lock(&mutex[p->nthread]);
             // The number of users playing must be known to the dealer (n_users), if there are no users -> return to main(?)
             // which user is going to play against the dealer?, other users  must wait and will need to be notified by the dealer
@@ -294,6 +332,8 @@ void* serve_client (void* parameters) {  //thread_function
             // Make Calculations based on the answer from the thread. Compare it with your own values.
             //  Send the necessary values back to the client/clients
             //  Loop
+            pthread_mutex_unlock(&mutex[p->nthread]);
+            break;
         }
         case 1: { // Threadfunction1/ user1
 
@@ -328,3 +368,4 @@ void* serve_client (void* parameters) {  //thread_function
     }
 
 }
+
