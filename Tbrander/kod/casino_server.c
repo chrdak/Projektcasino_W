@@ -55,22 +55,25 @@ void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
 void game_running(DECK card[],PLAYER usr[]);
 void shuffleDeck(DECK card[]);
 void deal_cards(PLAYER usr[],DECK card[]);
-int server(DECK card[], PLAYER usr[]);
 void* serve_client (void* parameters);    // thread function
-int server(DECK card[], PLAYER usr[]);
+void server(DECK card[], PLAYER usr[]);
 //-------------------------------------------------
 
 /*Global variables*/
 pthread_mutex_t mutex[5];             // An global array of 5 mutexes
-int consocket;
+
 int test;
+int usr_tot=0;              // Number of users connected
+THREAD tdata[5]; // this is the threads individual data(struct server_threads)
+DECK card[60];     // Klient, server
+PLAYER usr[5];     // Klient, server
+
 //************************************ MAIN *********************************************
 
 int main( int argc, char* args[] ) {
 
     srand(time(NULL)); // Server
-    DECK card[60];     // Klient, server
-    PLAYER usr[5];     // Klient, server
+
     card_init(card,usr); // // Klient, server
     //shuffleDeck(card); // Server
     //deal_cards(usr,card);
@@ -104,11 +107,7 @@ void deal_cards(PLAYER usr[],DECK card[]){
 }
 
 void game_running(DECK card[],PLAYER usr[]){
-    char str[1000];
-    while(1){
-        recv(consocket,str,100,0);
-        printf("%s\n",str);
-    }
+
 }
 
 void shuffleDeck(DECK card[]){
@@ -152,7 +151,7 @@ void card_init(DECK card [], PLAYER usr[]){
         ++realValue;
         ++gameValue;
         card[53].real_value=0;card[53].type=0;card[53].game_value=0;
-        printf(" Real Value = %d    Type = %d    Value = %d      Path = %s \n ",card[i].real_value,card[i].type,card[i].game_value, card[i].path);
+        //printf(" Real Value = %d    Type = %d    Value = %d      Path = %s \n ",card[i].real_value,card[i].type,card[i].game_value, card[i].path);
     }
 }
 
@@ -264,14 +263,14 @@ void card_init2(DECK card[], PLAYER usr[]){
 
 
 /*    SERVERKOD   */
-int server(DECK card[], PLAYER usr[]) {
-    int server_socket,i;
+void server(DECK card[], PLAYER usr[]) {
+    int server_socket,i,consocket;
     int listen_socket; // socket used to listen for incoming connections
     struct sockaddr_in serv, dest;
     char msg[] = "Connected with server.\n";
-
+    char buffer[100]={0};
     // thread and mutex initialization
-    THREAD tdata[5]; // this is the threads individual data(struct server_threads)
+
     pthread_t thread_id[5];  // thread ID given to 5 elements in the array
     for(i = 0; i < 5; i++)
     {
@@ -282,6 +281,7 @@ int server(DECK card[], PLAYER usr[]) {
     //daemonize();
 
     int pid=getpid();
+
     socklen_t socksize = sizeof(struct sockaddr_in);
     memset(&serv, 0, sizeof(serv));           // zero the struct before filling the fields
     serv.sin_family = AF_INET;                // set the type of connection to TCP/IP
@@ -292,36 +292,41 @@ int server(DECK card[], PLAYER usr[]) {
     test=listen(listen_socket, 4); assert(test==0); // a maximum of 4 connections simultaniously can be  made
 
 
-    //Main-Accept loop
-    while(1) {
+   while(1){
+    //Accept loop
+    while(usr_tot<5) {
         consocket = accept(listen_socket, (struct sockaddr *)&dest, &socksize);
         if(consocket == -1) {  // if accept fails to initialize connection -> return value == -1
             continue;
         }
-        printf("Incoming connection from %s - sending welcome\n", inet_ntoa(dest.sin_addr));
-        send(consocket, msg, strlen(msg), 0);
+        //printf("Incoming connection from %s - sending welcome\n", inet_ntoa(dest.sin_addr)); //This code snippet will gen. an error. But it works anyway!
+        //send(consocket, msg, strlen(msg), 0);
 
         //Dealer initilization: The dealer will have a separate thread without the need of an client
-        if(i==0){
+        if(usr_tot==0){
             tdata[0].tconsocket[0] = consocket;
             tdata[0].nthread = 0;
             pthread_create(&thread_id[0], NULL, &serve_client, (void *)&tdata[0]);
-            i++;
+            usr_tot++;
         }
         // Each individual client will be servered by a thread.     // Problem: Dealer och användare1 delar på samma socket
-        tdata[0].tconsocket[i] = consocket;
-        tdata[0].n_users = i;  // the number of users currently connected must be known to thread[0]/Dealer
-        tdata[i].nthread = i;
-        pthread_create(&thread_id[i], NULL, &serve_client,(void *)&tdata[i]);
-      //  pthread_create(&filosof[i], NULL, &philosophize, (void *)&filosof_info[i]); // Skapar nya trådar och ger dem rätt nr
-        i++;
+        tdata[0].tconsocket[usr_tot] = consocket;
+        tdata[0].n_users = usr_tot;  // the number of users currently connected must be known to thread[0]/Dealer
+        tdata[usr_tot].nthread = usr_tot;
+        pthread_create(&thread_id[usr_tot], NULL, &serve_client,(void *)&tdata[usr_tot]); //Skulle behöva skicka tre structar...
+        usr_tot++;
+
+
+
     }
+
+}
 
 }
 
 
 void* serve_client (void* parameters) {  //thread_function
-
+    char buffer[100]="Testar..";
     THREAD* p = (THREAD*) parameters;
     switch(p->nthread) {
         case 0: { // Dealer
@@ -338,6 +343,13 @@ void* serve_client (void* parameters) {  //thread_function
         case 1: { // Threadfunction1/ user1
 
             pthread_mutex_lock(&mutex[p->nthread]);
+
+
+            send(tdata[0].tconsocket[1],buffer,strlen(buffer),0);
+            memset(&buffer[0], 0, sizeof(buffer));
+            snprintf(buffer,strlen(card[1].path),"%s",card[1].path);
+            send(tdata[0].tconsocket[1],buffer,strlen(buffer),0);
+
             pthread_mutex_unlock(&mutex[p->nthread]);
             // Stay in a loop and wait for the dealer to make contact.
             // Based  on the information ->(waiting for turn): only make changes to your surroundings and loop, your turn: calculate game vaules,and send to dealer and loop
