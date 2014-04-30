@@ -99,7 +99,7 @@ int main( int argc, char* args[] ) {
     if (!loadMedia(card)){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
-    //connect_to_server(card,usr);
+    connect_to_server(card,usr);
     game_running(card,usr); // game loop
 
  return 0;
@@ -267,15 +267,6 @@ bool loadMedia(DECK card[]){
 
     // ------------------------------ LOAD BUTTONS AND GAMEBOARD ---------------------------------
 
-/*
-    int imgFlags = IMG_INIT_PNG;
-
-    if( !( IMG_Init( imgFlags ) & imgFlags ) ) {
-        printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
-        success = false;
-        exit(1);
-        }
-*/
     table_img=loadSurface(table);
     hit_img=loadSurface(hit_button);
     stand_img=loadSurface(stand_button);

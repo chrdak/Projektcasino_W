@@ -46,6 +46,7 @@ struct server_threads{
     int nthread;
     int n_users;  // the number of users currently connected
     int tconsocket[5]; // the threads own connectionsocket
+
 };
 typedef struct server_threads THREAD;
 
@@ -61,10 +62,9 @@ void server(DECK card[], PLAYER usr[]);
 
 /*Global variables*/
 pthread_mutex_t mutex[5];             // An global array of 5 mutexes
-
+int checksock[4] = {0};               // Busy socket check
 int test;
 int usr_tot=0;              // Number of users connected
-THREAD tdata[5]; // this is the threads individual data(struct server_threads)
 DECK card[60];     // Klient, server
 PLAYER usr[5];     // Klient, server
 
@@ -155,133 +155,23 @@ void card_init(DECK card [], PLAYER usr[]){
     }
 }
 
-void card_init2(DECK card[], PLAYER usr[]){
-    int i=0,j=1,h=10;
-    char tmp[5];
-    for (i=0;i<54;++i){
-        strcpy(card[i].path,"grafik/cards/");
-        snprintf(tmp,5,"%d",i);
-        strcat(card[i].path,tmp);
-        strcat(card[i].path,".bmp");
-    }
-    card[0].game_value=0; card[0].type=0; // Value and type for the back piece (blue)
-    card[53].game_value=0; card[53].type=0; // Value and type for the back piece (red)
-
-    for (i=1;i<53;++i){
-        // Hearts
-        if(i<10){ // 1-9
-            card[i].game_value=j;
-            ++j;
-            card[i].type=1; // Hearts =1
-        }
-        else if (i>9 && i<14){ //10-13
-            j=1;
-            card[i].game_value=10;
-            card[i].type=1; // Hearts =1
-            }
-
-        //Clubbs
-        else if(i>13 && i < 23){ // 14-22
-            card[i].game_value=j;
-            ++j;
-            card[i].type=2; // Clubbs =2
-        }
-        else if(i>22 && i<27){ // 23-26
-            j=1;
-            card[i].game_value=10;
-            card[i].type=2; // Clubbs =2
-            }
-        //Diamonds
-        else if(i>26 && i < 36){ // 27-35
-            card[i].game_value=j;
-            ++j;
-            card[i].type=3; // Diamonds =3
-            }
-        else if(i>35 && i<40){ // 36-39
-            j=1;
-            card[i].game_value=10;
-            card[i].type=3; // Diamonds =3
-            }
-            //Spades
-        else if(i>39 && i < 49){ // 40-48
-            card[i].game_value=j;
-            ++j;
-            card[i].type=4; // Spades =4
-            }
-        else if(i>48 && i<53){ // 49-52
-            j=1;
-            card[i].game_value=10;
-            card[i].type=4; // Spades =4
-            }
-    }
-    // Här ges klädda kort sina riktiga värden
-    for(i=10;i<4;++i){
-        card[i].real_value=h;
-        ++h;
-    }
-    h=10;
-    for(i=23;i<4;++i){
-        card[i].real_value=h;
-        ++h;
-    }
-    h=10;
-    for(i=36;i<4;++i){
-        card[i].real_value=h;
-        ++h;
-    }
-    h=10;
-    for(i=49;i<4;++i){
-        card[i].real_value=h;
-        ++h;
-    }
-    // ------------------------------------------
-
-
-    // Black Jack-värde och riktigt värde för alla Ess
-    card[1].game_value=11;card[1].real_value=14;
-    card[14].game_value=11;card[14].real_value=14;
-    card[27].game_value=11;card[27].real_value=14;
-    card[40].game_value=11;card[40].real_value=14;
-
-    // Initializeing card positions for each player, from the left.
-    //Dealer
-    usr[0].x1=500; usr[0].y1=90;
-    usr[0].x2=600; usr[0].y2=90;
-    // Player 1
-    usr[1].x1=160; usr[1].y1=300;
-    usr[1].x2=240; usr[1].y2=300;
-    //Player 2
-    usr[2].x1=380; usr[2].y1=350;
-    usr[2].x2=460; usr[2].y2=350;
-    // Player 3
-    usr[3].x1=600; usr[3].y1=350;
-    usr[3].x2=680; usr[3].y2=350;
-    // Player 4
-    usr[4].x1=840; usr[4].y1=300;
-    usr[4].x2=920; usr[4].y2=300;
-}
-
-
 /*    SERVERKOD   */
 void server(DECK card[], PLAYER usr[]) {
     int server_socket,i,consocket;
+
     int listen_socket; // socket used to listen for incoming connections
     struct sockaddr_in serv, dest;
     char msg[] = "Connected with server.\n";
     char buffer[100]={0};
     // thread and mutex initialization
-
+    THREAD tdata[5]; // this is the threads individual data(struct server_threads)
     pthread_t thread_id[5];  // thread ID given to 5 elements in the array
     for(i = 0; i < 5; i++)
     {
         pthread_mutex_init (&mutex[i], NULL);// initialize mutex i where i: 0..4
     }
     i = 0; // reseting the variable for future use
-
-    //daemonize();
-
     int pid=getpid();
-
     socklen_t socksize = sizeof(struct sockaddr_in);
     memset(&serv, 0, sizeof(serv));           // zero the struct before filling the fields
     serv.sin_family = AF_INET;                // set the type of connection to TCP/IP
@@ -293,6 +183,9 @@ void server(DECK card[], PLAYER usr[]) {
 
 
    while(1){
+       if(usr_tot >4) {
+           fprintf(stderr, "MER ÄN 4!\n");
+       }
     //Accept loop
     while(usr_tot<5) {
         consocket = accept(listen_socket, (struct sockaddr *)&dest, &socksize);
@@ -311,22 +204,26 @@ void server(DECK card[], PLAYER usr[]) {
         }
         // Each individual client will be servered by a thread.     // Problem: Dealer och användare1 delar på samma socket
         tdata[0].tconsocket[usr_tot] = consocket;
+        tdata[usr_tot].tconsocket[usr_tot] = consocket;
         tdata[0].n_users = usr_tot;  // the number of users currently connected must be known to thread[0]/Dealer
         tdata[usr_tot].nthread = usr_tot;
-        pthread_create(&thread_id[usr_tot], NULL, &serve_client,(void *)&tdata[usr_tot]); //Skulle behöva skicka tre structar...
-        usr_tot++;
-
-
-
-    }
-
-}
+        pthread_create(&thread_id[usr_tot], NULL, &serve_client,(void *)&tdata[usr_tot]);
+        checksock[usr_tot]=usr_tot;
+        usr_tot = 1;
+        for(i=0;i<5;++i){
+            if(checksock[i] == i)
+            {
+                usr_tot++;
+            }
+        }
+    } // inner while
+} // outer while
 
 }
 
 
 void* serve_client (void* parameters) {  //thread_function
-    char buffer[100]="Testar..";
+
     THREAD* p = (THREAD*) parameters;
     switch(p->nthread) {
         case 0: { // Dealer
@@ -337,19 +234,22 @@ void* serve_client (void* parameters) {  //thread_function
             // Make Calculations based on the answer from the thread. Compare it with your own values.
             //  Send the necessary values back to the client/clients
             //  Loop
+            for(;;);
             pthread_mutex_unlock(&mutex[p->nthread]);
             break;
         }
         case 1: { // Threadfunction1/ user1
 
+            char buffer[100]="case 1";
             pthread_mutex_lock(&mutex[p->nthread]);
 
-
-            send(tdata[0].tconsocket[1],buffer,strlen(buffer),0);
+            send(p->tconsocket[p->nthread],buffer,strlen(buffer),0);
             memset(&buffer[0], 0, sizeof(buffer));
-            snprintf(buffer,strlen(card[1].path),"%s",card[1].path);
-            send(tdata[0].tconsocket[1],buffer,strlen(buffer),0);
 
+            for(;;);
+
+
+            usr_tot=p->nthread;
             pthread_mutex_unlock(&mutex[p->nthread]);
             // Stay in a loop and wait for the dealer to make contact.
             // Based  on the information ->(waiting for turn): only make changes to your surroundings and loop, your turn: calculate game vaules,and send to dealer and loop
@@ -358,23 +258,49 @@ void* serve_client (void* parameters) {  //thread_function
         }
         case 2: { // Threadfunction2/ user2
 
+            char buffer[100]="case 2";
             pthread_mutex_lock(&mutex[p->nthread]);
+
+            send(p->tconsocket[p->nthread],buffer,strlen(buffer),0);
+            memset(&buffer[0], 0, sizeof(buffer));
+
+            for(;;);
+
+            usr_tot=p->nthread;
             pthread_mutex_unlock(&mutex[p->nthread]);
             break;
         }
         case 3: { // Threadfunction3/ user3
 
+            char buffer[100]="case 3";
             pthread_mutex_lock(&mutex[p->nthread]);
+
+            send(p->tconsocket[p->nthread],buffer,strlen(buffer),0);
+            memset(&buffer[0], 0, sizeof(buffer));
+
+            for(;;);
+
+            usr_tot=p->nthread;
             pthread_mutex_unlock(&mutex[p->nthread]);
             break;
         }
         case 4: { // Threadfunction4/ user4
+            char buffer[100]="case 4";
             pthread_mutex_lock(&mutex[p->nthread]);
+
+            send(p->tconsocket[p->nthread],buffer,strlen(buffer),0);
+            memset(&buffer[0], 0, sizeof(buffer));
+
+            for(;;);
+
+            usr_tot=p->nthread;
             pthread_mutex_unlock(&mutex[p->nthread]);
             break;
         }
-        default: { // Maximum number of users has been reached!
+        default: {
 
+        fprintf(stderr, "ERROR"); // Maximum number of users has been reached!
+                    break;
         }
 
     }
