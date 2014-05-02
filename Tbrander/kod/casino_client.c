@@ -29,6 +29,7 @@
 
 // --------------------------------------------------------------------------------------------------
 
+
 struct card{
     char path[100];
     int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
@@ -47,13 +48,13 @@ struct player_pos_value{
 typedef struct player_pos_value PLAYER;
 
 struct server_threads{
-    DECK tdeck;  // thread_deck
-    PLAYER tplayer; // thread_player_position_value
     int nthread;
     int n_users;  // the number of users currently connected
     int tconsocket[5]; // the threads own connectionsocket
 };
 typedef struct server_threads THREAD;
+
+struct
 
 
 /*FUNKTIONS PROTOTYPER*/
@@ -93,13 +94,14 @@ int main( int argc, char* args[] ) {
     DECK card[60];     // Klient, server
     PLAYER usr[5];     // Klient, server
     card_init(card,usr); // // Klient, server
-    login_init();
+    //login_init();
+    connect_to_server(card,usr);
     SDL_initializer(); // klient
-    //shuffleDeck(card); // Server
+
     if (!loadMedia(card)){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
-    connect_to_server(card,usr);
+
     game_running(card,usr); // game loop
 
  return 0;
@@ -124,31 +126,131 @@ void display_text(PLAYER usr[],int playerNr){
     TTF_CloseFont(font);
 }
 
-void game_running(DECK card[],PLAYER usr[]){
+
+
+
+void game_running(DECK card, PLAYER usr[], struct sockaddr_in dest){
+    int x,y;
+    int hit = 0; // message to server for hit
+    int stand = 1; // message to server for stand
+    int bustOrLost = 2; // not using for the moment
+    int newGame = 3; // message to server for new game
+    int win = 4; // not using for the moment
+    int newGameCount = 0; // keeps count on how many times to receive data when new game starts (deal cards function in server)
+    bool gamePlay = false; // if true then game is running
+    int closeSocketmessage = 666;
+    printf("Welcome\n");
+
+    usr[0].score = 0;
+    usr[0].handPos = 0;
+
+    SDL_Rect newGameButton;
+    Uint32 newGamecolor = SDL_MapRGB(screen->format,0x65,0x33,0x32);
+
+    newGameButton.x = 0;
+    newGameButton.y = 0;
+    newGameButton.w = 80;
+    newGameButton.h = 40;
+
+    SDL_Rect winLoseMessage; // displayed on win or lose
+    Uint32 winColor = SDL_MapRGB(screen->format,0xFF,0xFF,0x32); // for the rect color on win
+    Uint32 loseColor = SDL_MapRGB(screen->format,0xFF,0x33,0x32); // for the rect color on lose
+
+    winLoseMessage.x = 880; // position on screen
+    winLoseMessage.y = 150; // position on screen
+    winLoseMessage.w = 80; // width size
+    winLoseMessage.h = 40; // height size
 
     while(running){
 
-        while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
-          {
-             if( event.type == SDL_QUIT ){
-                running = false; // Gameloop flag false
-                quit(card);
-                exit(0);
+        if(gamePlay == false) {
+            SDL_FillRect(screen,&newGameButton,newGamecolor); // only show new game button when there is no current hand in play
+        }
+
+        SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+
+        while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
+             switch( event.type){
+                case SDL_QUIT:
+                    running = false; // Gameloop flag false
+                    send(client_socket, &closeSocketmessage, sizeof(closeSocketmessage), 0);
+                    quit(card);
+                    close(client_socket);
+                    exit(0);
+                    break;
+                case SDL_MOUSEBUTTONDOWN:// button clicks
+                    x = event.button.x; // used to know where on x-axis is currently being clicked
+                    y = event.button.y; // used to know where on y-axis is currently being clicked
+
+                            //HIT BUTTON
+                    if(x>550 && x< 550+98 && y>530 && y<530+49 && usr[0].score < 21 && gamePlay == true) { // can only be clicked while gameplay is true
+                        send(client_socket, &hit, sizeof(hit), 0); // send hit message to server
+                        recv(client_socket, &card, sizeof(card), 0); // recv a card struct from server
+                        recv(client_socket, &usr[0], sizeof(usr[0]), 0); // recv a usr struct from server
+                        printf("Player: %d\n", usr[0].score); // print score in command
+                        loadCard(card); // load card, display card, free space
+
+                        if(usr[0].score > 21) { // if player busts show new game button
+                            gamePlay = false;
+                            SDL_FillRect(screen,&winLoseMessage,loseColor);
+                        }
+                        display_text(usr);
+                    }
+                        // STAND BUTTON
+                    if(x>670 && x< 670+98 && y>530 && y<530+49 && usr[0].score <= 21 && gamePlay == true) { // stand button
+                        send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
+                        while(usr[1].score < 17) { // receive card while server/dealer is less than 17
+                            recv(client_socket, &card, sizeof(card), 0); // receive card to be displayed on dealer part of screen
+                            recv(client_socket, &usr[1].score, sizeof(usr[1].score), 0); // receive current dealer score
+                            printf("Dealer: %d\n", usr[1].score); // print dealer score
+                            loadCard(card); // load card, display card, free space
+                        }
+
+                        if(usr[0].score > usr[1].score && usr[0].score < 22 || usr[1].score > 21) { // if win show yellow color rect
+                            SDL_FillRect(screen,&winLoseMessage,winColor);
+                        }
+                        if(usr[1].score > usr[0].score && usr[1].score < 22 || usr[1].score == usr[0].score || usr[0].score > 21) { // if lose show red color rect
+                            SDL_FillRect(screen,&winLoseMessage,loseColor);
+                        }
+                        gamePlay = false; // no current game, new game button appears
+
+                    }
+                    if(x>0 && x< 0+80 && y>0 && y<0+40 && gamePlay == false) { // new game button
+
+                       usr[0].score = 0; // player score
+                       usr[1].score = 0; // dealer score
+                       usr[0].handPos = 0; // variable card in hand position of player
+
+                        if (!loadMedia(card)){ // Calling function for loading 24-bit images in to the memory
+                            printf("Cant load img.\n");
+                        }
+                        send(client_socket, &newGame, sizeof(newGame), 0); // new game message to server
+                        printf("New Game\n");
+
+                            while(newGameCount < 3) { // first deal of cards
+                                recv(client_socket, &card, sizeof(card), 0); // receive card from server
+                                loadCard(card);
+                                usr[0].score+=card.game_value;
+                                ++newGameCount;
+                            }
+
+                            recv(client_socket, &usr[0], sizeof(usr[0]), 0); // receive card from server
+                            recv(client_socket, &usr[1], sizeof(usr[1]), 0); // receive card from server
+                            display_text(usr);
+                            newGameCount=0;
+                            gamePlay = true;
+                            printf("Dealer: %d\n", usr[1].score);
+                            printf("Player: %d\n", usr[0].score);
+                    }
+                    break;
              }
-          }
-     }
+
+        }
+    }
+
 }
 
-void shuffleDeck(DECK card[]){
-    int i,j;
-    DECK tmp[60];
-    for (i=1; i<53;++i){
-        j= rand()%52+1;
-        tmp[i]=card[i];
-        card[i]=card[j];
-        card[j]=tmp[i];
-    }
-}
+
 
 void connect_to_server(DECK card[],PLAYER usr[]){
 
@@ -162,11 +264,11 @@ void connect_to_server(DECK card[],PLAYER usr[]){
     //dest.sin_addr.s_addr = htonl(INADDR_LOOPBACK); /* set destination IP number - localhost, 127.0.0.1*/
     dest.sin_port = htons(PORTNUM);                /* set destination port number */
 
-    test=connect(client_socket, (struct sockaddr *)&dest, sizeof(struct sockaddr));   //assert(test==0);
-    /*if (test<0){
+    test=connect(client_socket, (struct sockaddr *)&dest, sizeof(struct sockaddr));
+    if (test<0){
         perror("Can't connect to server\n");
         exit(1);
-    }*/
+    }
     memset(&buffer[0], 0, sizeof(buffer));
     mess_len = recv(client_socket, buffer,100,0);
     printf("%s",buffer);
@@ -323,6 +425,7 @@ void card_init(DECK card [], PLAYER usr[]){
 
     for (i=0;i<54;++i){
         sprintf(card[i].path,"grafik/cards/%d.bmp",i);
+        card[i].card_id=i;// Set card id
         if(i > 1 && i < 10 || i > 14 && i < 23 || i > 27 && i < 36 || i > 40 && i < 49){ // all cards between 2 and 9
             card[i].game_value=gameValue;
             card[i].real_value=realValue;
