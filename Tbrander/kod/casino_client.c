@@ -42,9 +42,8 @@ struct card{
 typedef struct card DECK;
 
 struct player_pos_value{
-    int score, x1, y1,x2,y2,bet,tot_holding;
-    DECK hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om tilldelade kort, färg, värden..
-};                 // Plats [0] är första tilldelade kortet osv.
+    int score, xPos,yPos,bet,tot_holding;
+};
 typedef struct player_pos_value PLAYER;
 
 struct server_threads{
@@ -54,7 +53,13 @@ struct server_threads{
 };
 typedef struct server_threads THREAD;
 
-struct
+struct nClient{
+    DECK hand[15];
+    PLAYER player;
+    THREAD nUser;
+};
+typedef struct nClient NCLIENT;
+
 
 
 /*FUNKTIONS PROTOTYPER*/
@@ -110,7 +115,7 @@ int main( int argc, char* args[] ) {
 
 void display_text(PLAYER usr[],int playerNr){
 
-    int xPos=usr[playerNr].x1,yPos=usr[playerNr].y1+120; // Every users position stored in xPos, yPos
+    int x=usr[playerNr].xPos,y=usr[playerNr].yPos+120; // Every users position stored in xPos, yPos
     char scoreToDisplay[10]={0};
     snprintf(scoreToDisplay,10,"Sum: %d",usr[playerNr].score); // Translate int to string, storing it in scoreToDisplay
     TTF_Init(); // Initialize SDL_ttf
@@ -118,7 +123,7 @@ void display_text(PLAYER usr[],int playerNr){
     SDL_Color text_color = {255, 245, 0};
     text = TTF_RenderText_Blended(font,scoreToDisplay,text_color); // Blended = smoother edges, Solid = sharper edges
 
-    SDL_Rect textLocation = { xPos,yPos, 0, 0 }; // Position of text, relativ to user
+    SDL_Rect textLocation = { x,y, 0, 0 }; // Position of text, relativ to user
     SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
     // Free text
     SDL_FreeSurface(text);

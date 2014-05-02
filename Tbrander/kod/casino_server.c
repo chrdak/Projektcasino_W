@@ -73,56 +73,50 @@ PLAYER usr[5];
 NCLIENT nClient[5];
 //************************************ MAIN *********************************************
 
-int main( int argc, char* args[] ) {
-
-    srand(time(NULL)); // Server
-    card_init(); // // Klient, server
+int main() {
+    srand(time(NULL));
+    card_init();
     server();
-    game_running(); // game loop
- return 0;
+    game_running();
+    return 0;
 }
 //***************************************************************************************
 
-void deal_init(){
-    int i=0,playerNr=0;
-    for(i=0;i<usr_tot+1;++i){ // 5 = Number of users inc dealer
+void deal_init(){ // Initialize nClient before we send the struct to every connected player.
 
-        // Rectangles for positioning (deal 1)
-        card[i].CardPos.x=usr[playerNr].xPos;
-        card[i].CardPos.y=usr[playerNr].yPos;
-        card[i].CardPos.w=70;
-        card[i].CardPos.h=106;
-        usr[playerNr].score+=card[i].game_value;
-        ++playerNr;
+    int i,cardNr;
+
+    // The inner loop will give each users hand[] a card from the shuffled deck, card[], and also add the score.
+    // The outer loop determins how many cards each player will recive, two for the initial deal.
+    for(cardNr=0;cardNr<2;++cardNr){
+        for(i=0;i<=usr_tot;++i){
+            nClient[i].hand[cardNr] = card[i]; // The dealer will recive card[0], the blue back piece
+            nClient[i].player.score+=card[i].game_value;
+        }
     }
-    playerNr=0;
-        for(i=usr_tot;i<10;++i){// 5 = Number of users inc dealer
-        // Rectangles for positioning (deal 2)
-        card[i].CardPos.x=usr[playerNr].xPos+50;
-        card[i].CardPos.y=usr[playerNr].yPos;
-        card[i].CardPos.w=75;
-        card[i].CardPos.h=111;
-        usr[playerNr].score+=card[i].game_value;
-        ++playerNr;
-   }
+    // Update the total number of connected users.
+    for (i=0;i<5;++i){
+        nClient[i].nUser.n_users=usr_tot;
+    }
+    /*
+    X, Y positions
+    Dealer = 0
+    Player = 1, 2, 3, 4
+    */
+    nClient[0].player.xPos=500;
+    nClient[0].player.yPos=90;
 
+    nClient[1].player.xPos=840;
+    nClient[1].player.yPos=300;
 
-        nClient[0].player.xPos=500;
-        nClient[0].player.yPos=90;
+    nClient[2].player.xPos=600;
+    nClient[2].player.yPos=350;
 
-        nClient[1].player.xPos=840;
-        nClient[1].player.yPos=300;
+    nClient[3].player.xPos=380;
+    nClient[3].player.yPos=350;
 
-        nClient[2].player.xPos=600;
-        nClient[2].player.yPos=350;
-
-        nClient[3].player.xPos=380;
-        nClient[3].player.yPos=350;
-
-        nClient[4].player.xPos=160;
-        nClient[4].player.yPos=300;
-
-        //nClient[i].hand[i] = card[i];
+    nClient[4].player.xPos=160;
+    nClient[4].player.yPos=300;
 
 }
 
@@ -255,11 +249,18 @@ void* serve_client (void* parameters) {  //thread_function
         case 0: { // Dealer
             int i;
             pthread_mutex_lock(&mutex[p->nthread]);
-            nClient[0].nUser.n_users= p->n_users;
 
+            /* Kod för att ta emot bet från klient 1, 2, 3, 4
+                .
+                .
+                .
+            */
+
+            card_init(); // Initialize every client hand, score
             for(i= 1; i <= nClient[0].nUser.n_users; i++) {
 
                 if(checksock[i] == i) {
+
                     nClient[1].nUser.nthread=i;
                     send(p->tconsocket[p->nthread], (void*)&nClient, sizeof(NCLIENT), 0);
 
@@ -267,6 +268,20 @@ void* serve_client (void* parameters) {  //thread_function
 
                 }
             }
+
+            // Förslag
+            //---------------
+            // for(i=1;i<(p->tconsocket[p->nthread]);++i)
+
+            /* Kod för att ta emot hit, stand
+                .
+                .
+                .
+            */
+
+            // if (hit) --> Funktion() som delar ut kort till aktiv klient som tryckt på hit.
+            // else if (stand)
+                // continue, för att ta emot hit, stand från nästa klient på tur..
 
 
             // The number of users playing must be known to the dealer (n_users), if there are no users -> return to main(?)
