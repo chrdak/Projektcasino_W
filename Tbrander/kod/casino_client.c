@@ -1,7 +1,6 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
-//#include <SDL2/SDL_image.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +58,6 @@ struct nClient{
     THREAD nUser;
 };
 typedef struct nClient NCLIENT;
-
 
 
 /*FUNKTIONS PROTOTYPER*/
@@ -130,8 +128,6 @@ void display_text(PLAYER usr[],int playerNr){
     //Close the font
     TTF_CloseFont(font);
 }
-
-
 
 
 void game_running(DECK card, PLAYER usr[], struct sockaddr_in dest){
