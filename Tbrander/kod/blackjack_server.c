@@ -35,7 +35,7 @@ struct card{
 typedef struct card DECK;
 
 struct player_pos_value{
-    int score, x1, y1,x2,y2,bet,tot_holding;
+    int score, x1, y1,bet,tot_holding;
     int hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om tilldelade kort, färg, värden..
     int handPos;
 };                 // Plats [0] är första tilldelade kortet osv.
@@ -57,7 +57,7 @@ void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
 void game_running(DECK card[],PLAYER usr[]);
 void shuffleDeck(DECK card[]);
 void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition);
-int server(DECK card[], PLAYER usr[], int* deckPosition);
+void server(DECK card[], PLAYER usr[], int* deckPosition);
 void* serve_client (void* parameters);    // thread function
 void checkHandValue(PLAYER usr[], DECK card[], int user, int* deckPosition);
 void buttonListeninig(DECK card[], PLAYER usr[], THREAD tdata[], int message, int* deckPosition, int socketNumber);
@@ -92,6 +92,7 @@ void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
 
     usr[0].score = 0;
     usr[1].score = 0;
+
     usr[0].handPos = 0;
     usr[1].handPos = 0;
 
@@ -100,6 +101,10 @@ void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
 
     usr[0].y1 = 150;
     usr[1].y1 = 290;
+
+
+
+
 
     *deckPosition = 0;
     for(i=1;i<4;i++){
@@ -175,10 +180,8 @@ void card_init(DECK card [], PLAYER usr[]){
 }
 
 
-
-
 /*    SERVERKOD   */
-int server(DECK card[], PLAYER usr[], int* deckPosition) {
+void server(DECK card[], PLAYER usr[], int* deckPosition) {
     int server_socket,i=0, j;
     int listen_socket; // socket used to listen for incoming connections
     struct sockaddr_in serv, dest;
@@ -229,7 +232,6 @@ int server(DECK card[], PLAYER usr[], int* deckPosition) {
         printf("%d\n", i);
         running = true;
         pthread_create(&thread_id[i], NULL, &serve_client,(void *)&tdata[i]);
-      //  pthread_create(&filosof[i], NULL, &philosophize, (void *)&filosof_info[i]); // Skapar nya trådar och ger dem rätt nr! NYTT
         while(running == true) {
 
             recv(tdata[0].tconsocket[i], &message, sizeof(message), 0); // receives hit, stand, newgame messages from client
@@ -357,7 +359,7 @@ void* serve_client (void* parameters) {  //thread_function
 }
 
 void checkHandValue(PLAYER usr[], DECK card[], int user, int* deckPosition) { // calculates current hand value
-    usr[user].hand[ usr[user].handPos ] = card[*deckPosition].game_value; // stores current card value in postion j of hand array
+    usr[user].hand[usr[user].handPos] = card[*deckPosition].game_value; // stores current card value in postion j of hand array
     ++usr[user].handPos;
     usr[user].score +=card[*deckPosition].game_value;
     int i;

@@ -35,7 +35,8 @@ struct card{
 typedef struct card DECK;
 
 struct player_pos_value{
-    int score, xPos, yPos,bet,tot_holding,stand,card_tot,winner,turn,quit;
+    int score, xPos, yPos,bet,tot_holding,stand,card_tot,winner,turn,quit,dealerTurn;
+    // tot_holding = totalt kapital
 };
 typedef struct player_pos_value PLAYER;
 
@@ -43,6 +44,7 @@ struct server_threads{
     int nthread;
     int n_users;  // the number of users currently connected
     int tconsocket[5]; // the threads own connectionsocket
+    int playerCon[5];
 };
 typedef struct server_threads THREAD;
 
@@ -61,6 +63,7 @@ void shuffleDeck();
 void deal_init();
 void* serve_client (void* parameters);    // thread function
 void server();
+void reset_players();
 //-------------------------------------------------
 
 /*Global variables*/
@@ -80,6 +83,8 @@ bool game = false;
 DECK card[60];
 PLAYER usr[5];
 NCLIENT nClient[5];
+
+
 //************************************ MAIN *********************************************
 
 int main() {
@@ -90,6 +95,20 @@ int main() {
     return 0;
 }
 //***************************************************************************************
+
+void reset_players(){
+    int i,j;
+    for(i=0;i<5;++i){
+        nClient[i].player.bet=0;
+        nClient[i].player.score=0;
+        nClient[i].player.card_tot=0;
+        nClient[i].player.stand=0;
+        nClient[i].player.turn=0;
+        nClient[i].player.winner=0;
+        nClient[i].player.quit=0;
+        nClient[i].player.dealerTurn=0;
+    }
+}
 
 void deal_init(){ // Initialize nClient before we send the struct to every connected player.
 
@@ -290,20 +309,22 @@ void* serve_client (void* parameters) {  //thread_function
     switch(p->nthread) {
         case 0: { // Dealer
             for(;;){
+                pthread_mutex_lock(&mutex[p->nthread]); // LOCK
+
                 int i, playerTurn[5]={0},nHit=0;
-                pthread_mutex_lock(&mutex[p->nthread]);
                 while(player_tot<1){ /*Wait for player*/}
                 if (deckPosition>52){
                     shuffleDeck();
                     deckPosition=1;
                 }
                 for(i=1;i<5;i++) { // Copy the connected users
-                playerTurn[i]=checksock[i];
+                    playerTurn[i]=checksock[i];
+                    nClient[i].nUser.playerCon[i] = checksock[i];
                 }
                 game=true;
+
+                reset_players();
                 deal_init(deckPosition);
-
-
                 first_deal=1; // Begin the game
 
                 for(i=1;i<5;++i){   // Turn
@@ -329,6 +350,7 @@ void* serve_client (void* parameters) {  //thread_function
                         }
                     }
                 }
+
                 send_flagWinner=1;
                 first_deal=0;
                 game=false;
@@ -339,7 +361,7 @@ void* serve_client (void* parameters) {  //thread_function
         case 1: { // Threadfunction1/ user1
             pthread_mutex_lock(&mutex[p->nthread]);
             nClient[p->nthread].nUser.nthread=p->nthread;
-            send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0); // send nthread
+            send(p->tconsocket[p->nthread], &p->nthread, sizeof(int), 0); // send nthread
             int stand=0,nHit=1;
             player_tot++;
             while(nClient[p->nthread].player.quit!=1){ // Game loop for the thread
@@ -374,9 +396,11 @@ void* serve_client (void* parameters) {  //thread_function
                 }
                 turn=0;
                 while(send_flagDealer==0){ /* wait for turn and send info while waiting*/}
+                    nClient[p->nthread].player.dealerTurn=1;
                     send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0);
 
-                while(send_flagWinner==0){ /* wait for turn and send info while waiting*/}
+                while(send_flagWinner==0){ /* wait for winner decision and send info while waiting*/}
+                    nClient[p->nthread].player.dealerTurn=0;
                     send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0);
 
                 } // While not quit
@@ -392,7 +416,7 @@ void* serve_client (void* parameters) {  //thread_function
         case 2: { // Threadfunction2/ user2
             pthread_mutex_lock(&mutex[p->nthread]);
             nClient[p->nthread].nUser.nthread=p->nthread;
-            send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0); // send nthread
+            send(p->tconsocket[p->nthread], &p->nthread, sizeof(int), 0); // send nthread
             int stand=0,nHit=1;
             player_tot++;
             while(nClient[p->nthread].player.quit!=1){ // Game loop for the thread
@@ -427,9 +451,11 @@ void* serve_client (void* parameters) {  //thread_function
                 }
                 turn=0;
                 while(send_flagDealer==0){ /* wait for turn and send info while waiting*/}
+                    nClient[p->nthread].player.dealerTurn=1;
                     send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0);
 
-                while(send_flagWinner==0){ /* wait for turn and send info while waiting*/}
+                while(send_flagWinner==0){ /* wait for winner decision and send info while waiting*/}
+                    nClient[p->nthread].player.dealerTurn=0;
                     send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0);
 
                 } // While not quit
@@ -445,7 +471,7 @@ void* serve_client (void* parameters) {  //thread_function
         case 3: { // Threadfunction3/ user3
             pthread_mutex_lock(&mutex[p->nthread]);
             nClient[p->nthread].nUser.nthread=p->nthread;
-            send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0); // send nthread
+            send(p->tconsocket[p->nthread], &p->nthread, sizeof(int), 0); // send nthread
             int stand=0,nHit=1;
             player_tot++;
             while(nClient[p->nthread].player.quit!=1){ // Game loop for the thread
@@ -480,9 +506,11 @@ void* serve_client (void* parameters) {  //thread_function
                 }
                 turn=0;
                 while(send_flagDealer==0){ /* wait for turn and send info while waiting*/}
+                    nClient[p->nthread].player.dealerTurn=1;
                     send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0);
 
-                while(send_flagWinner==0){ /* wait for turn and send info while waiting*/}
+                while(send_flagWinner==0){ /* wait for winner decision and send info while waiting*/}
+                    nClient[p->nthread].player.dealerTurn=0;
                     send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0);
 
                 } // While not quit
@@ -494,12 +522,11 @@ void* serve_client (void* parameters) {  //thread_function
             // Based  on the information ->(waiting for turn): only make changes to your surroundings and loop, your turn: calculate game vaules,and send to dealer and loop
             // (user has exited): Reset all your values, notify the server that the slot is empty(setting i == p->nthread) and unlock your mutex -> Return to main
             break;
-
         }
         case 4: { // Threadfunction4/ user4
-             pthread_mutex_lock(&mutex[p->nthread]);
+            pthread_mutex_lock(&mutex[p->nthread]);
             nClient[p->nthread].nUser.nthread=p->nthread;
-            send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0); // send nthread
+            send(p->tconsocket[p->nthread], &p->nthread, sizeof(int), 0); // send nthread
             int stand=0,nHit=1;
             player_tot++;
             while(nClient[p->nthread].player.quit!=1){ // Game loop for the thread
@@ -534,9 +561,11 @@ void* serve_client (void* parameters) {  //thread_function
                 }
                 turn=0;
                 while(send_flagDealer==0){ /* wait for turn and send info while waiting*/}
+                    nClient[p->nthread].player.dealerTurn=1;
                     send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0);
 
-                while(send_flagWinner==0){ /* wait for turn and send info while waiting*/}
+                while(send_flagWinner==0){ /* wait for winner decision and send info while waiting*/}
+                    nClient[p->nthread].player.dealerTurn=0;
                     send(p->tconsocket[p->nthread], &nClient, sizeof(NCLIENT), 0);
 
                 } // While not quit
@@ -549,6 +578,8 @@ void* serve_client (void* parameters) {  //thread_function
             // (user has exited): Reset all your values, notify the server that the slot is empty(setting i == p->nthread) and unlock your mutex -> Return to main
             break;
         }
+
+
         default: {
 
         fprintf(stderr, "ERROR"); // Maximum number of users has been reached!
