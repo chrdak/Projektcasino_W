@@ -79,7 +79,7 @@ SDL_Surface* loadSurface(char* path); //Loads individual image
 SDL_Window* window = NULL;            //The window
 SDL_Surface* screen = NULL;           // The window surface
 SDL_Event event;                      //Event- for user interaction
-
+int client_socket=0;
 char table[50]="grafik/casino_betlight_off.bmp",hit_button[50]="grafik/hit_button.bmp",table_lights[50]="grafik/casino_betlight_on.bmp";
 char stand_button[50]="grafik/stand_button.bmp",bet_button[50]="grafik/bet_button.bmp";
 
@@ -89,14 +89,15 @@ char stand_button[50]="grafik/stand_button.bmp",bet_button[50]="grafik/bet_butto
 int main( int argc, char* args[] ) {
     srand(time(NULL));
     int nthread;
+    SDL_initializer();
     NCLIENT nClient[5];
     //login_init();
-    nthread=connect_to_server(nClient);
-    SDL_initializer();
 
     if (!loadMedia(nClient)){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
+    nthread=connect_to_server(nClient);
+
     game_running(nClient,nthread); // Game loop
     //quit(NCLIENT nClient[]);
  return 0;
@@ -177,26 +178,29 @@ void draw(NCLIENT nClient[],int nthread,int betSig){
     SDL_BlitScaled(hit_img, NULL, screen, &hit_Rect);       // hit button
     SDL_BlitScaled(stand_img, NULL, screen, &stand_Rect);   // stand button
     SDL_BlitSurface(bet_img, NULL, screen, &bet_Rect);      // bet button
-
+    SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
 // -------------------------------------------------------------------------------
 
 
     for(i=0;i<5;++i){ // test each space in the array
-        if(nClient[i].nUser.playerCon[i] == i){
-            for(j=0;j<nClient[i].player.card_tot;++j){
-                nClient[i].hand[j].card_img=loadSurface(nClient[i].hand[j].path);
+        if(nClient[1].nUser.playerCon[i] == i){
+
+
+            for(j=0;j<nClient[1].player.card_tot;++j){
+                nClient[i].hand[j].card_img=loadSurface(nClient[1].hand[j].path);
                 SDL_Rect    hand_Rect;
 
-                hand_Rect.x=nClient[i].player.xPos;
-                hit_Rect.y=nClient[i].player.yPos;
+                hand_Rect.x=nClient[1].player.xPos;
+                hit_Rect.y=nClient[1].player.yPos;
                 hit_Rect.w=98;
                 hit_Rect.h=49;
 
-                SDL_BlitScaled(nClient[i].hand[j].card_img, NULL, screen, &hand_Rect);   // stand button
-
+                SDL_BlitScaled(nClient[1].hand[j].card_img, NULL, screen, &hand_Rect);   // stand button
             }
+
         }
     }
+
     SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
 }
 
@@ -204,156 +208,173 @@ void game_running(NCLIENT nClient[],int nthread){
     bool game=true;
     int stand = 0,betSig=1;
     while (game==true){
+
+        draw(nClient,nthread,betSig);
         bet_client(nClient,nthread);
-        send(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0); // send nthread
-        // RITA, SKICKA BETSIG
+        send(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // send bet
+        draw(nClient,nthread,betSig);
         betSig=0;
         // LOOP väntar på bet från alla
+printf("\nBET SENT WAITING FOR OTHER BETS (bet: %d)\n",nClient[nthread].player.bet);
+        recv(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // Tar emot bet från alla
+        draw(nClient,nthread,betSig);
 
-        recv(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0);
-        // RITA
         // DIN TUR ?
+printf("\nAFTER BETS RECV, WAITING FOR TURN (bet: %d turn: %d)\n",nClient[nthread].player.bet,nClient[nthread].player.turn);
+
         while(nClient[nthread].player.turn!=nthread){
-            recv(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0); // TAR EMOT TURORDNING
-            // RITA
+            recv(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), MSG_DONTWAIT); // TAR EMOT TURORDNING
+            draw(nClient,nthread,betSig);
+            //printf("\n%d\n",nClient[nthread].player.turn);
         }
+printf("\nYOUR TURN (turn: %d)\n",nClient[nthread].player.turn);
+
         // VÅRAN TUR
-        while(nClient[nthread].player.stand!=0){
+        while(nClient[nthread].player.stand==0){
             hit_stand(nClient,nthread);
-            send(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0); // send stand or hit
-            recv(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0); // Tar emot kort, score osv.
-            // RITA
+            send(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // send stand or hit
+            recv(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // Tar emot kort, score osv.
+            printf("\nstand: %d\n",nClient[nthread].player.stand);  // värde på stand 1 el 0
+            draw(nClient,nthread,betSig);
         }
+printf("\nYOUR TURN IS OVER (turn: %d)\n",nClient[nthread].player.turn);
+
+        printf("\ncash: %d\n",nClient[nthread].player.tot_holding);  // KAPITAL
+        send(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // send stand or hit
+
+printf("\nWAITING FOR DEALER (turn: %d)\n",nClient[nthread].player.turn);
+
         while(nClient[nthread].player.dealerTurn != 1) {
-            recv(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0);
-            // RITA
+            recv(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0);
+            draw(nClient,nthread,betSig);
         }
+printf("\nDEALER IS DONE (winner: %d)\n",nClient[nthread].player.winner);
 
-
-
-    }
+    } //game loop
 }
 
 
 void bet_client(NCLIENT nClient[],int nthread){
-        int x,y,bet=0,stand=0;
-        while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
-
-            // RIT FUNKTION
-
-             switch( event.type){
+        int x,y,bet=0,stand=0,betSig=0;
+        while(betSig==0){
+            while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
 
 
-                case SDL_QUIT:
-                    nClient[nthread].player.quit=1;
-                    nClient[nthread].player.stand=1;
-                    send(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0); // send quit
-                   // quit(nClient);
-                    close(*nClient[nthread].nUser.tconsocket);
-                    exit(0);
-                    break;
+                 switch( event.type){
 
-                case SDL_MOUSEBUTTONDOWN:   {// button clicks
+                    case SDL_QUIT:
+                        nClient[nthread].player.quit=1;
+                        nClient[nthread].player.stand=1;
+                        send(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0); // send quit
+                       // quit(nClient);
+                        close(*nClient[nthread].nUser.tconsocket);
+                        exit(0);
+                        break;
 
-                        x = event.button.x; // used to know where on x-axis is currently being clicked
-                        y = event.button.y; // used to know where on y-axis is currently being clicked
+                    case SDL_MOUSEBUTTONDOWN:   {// button clicks
 
-                        if (event.button.button == (SDL_BUTTON_LEFT)){
+                            x = event.button.x; // used to know where on x-axis is currently being clicked
+                            y = event.button.y; // used to know where on y-axis is currently being clicked
 
-                        // + 1
-                                if(x>70 && x< 70+55 && y>86 && y<86+55 && nClient[nthread].player.tot_holding>bet+1) { // can only be clicked while gameplay is true
+                            if (event.button.button == (SDL_BUTTON_LEFT)){
 
-                                    bet+=1;
-                                    nClient[nthread].player.tot_holding-=1;
-                                    nClient[nthread].player.bet=bet;
-                                }
+                            // + 1
+                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && nClient[nthread].player.tot_holding>bet+1) { // can only be clicked while gameplay is true
 
-                        // + 10
-                                if(x>70 && x< 70+55 && y>150 && y<150+55 && nClient[nthread].player.tot_holding>bet+10) { // can only be clicked while gameplay is true
-
-                                    bet+=10;
-                                    nClient[nthread].player.tot_holding-=10;
-                                    nClient[nthread].player.bet=bet;
-                                }
-
-                        // + 50
-                                if(x>70 && x< 70+55 && y>215 && y<215+55 && nClient[nthread].player.tot_holding>bet+50) { // can only be clicked while gameplay is true
-
-                                    bet+=50;
-                                    nClient[nthread].player.tot_holding-=50;
-                                    nClient[nthread].player.bet=bet;
-                                }
-
-                        // + 100
-                                if(x>70 && x< 70+55 && y>277 && y<277+55 && nClient[nthread].player.tot_holding>bet+100) { // can only be clicked while gameplay is true
-
-                                    bet+=100;
-                                    nClient[nthread].player.tot_holding-=100;
-                                    nClient[nthread].player.bet=bet;
-                                }
-
-                        // BET BUTTON
-                                if(x>430 && x< 430+98 && y>530 && y<530+49) {
-                                    nClient[nthread].player.bet=bet;
-                                    break;
-                                }
-
-                        }// LEFT MOUSE
-
-        // ---------------------------------------------------------------------------------------------------------
-
-                        // RIGHT MOUSE
-
-                        // - 1
-                        if (event.button.button == (SDL_BUTTON_RIGHT)){
-                                if(x>70 && x< 70+55 && y>86 && y<86+55 && nClient[nthread].player.bet >= 1) { // can only be clicked while gameplay is true
-
-                                        bet-=1;
-                                        nClient[nthread].player.tot_holding+=1;
+                                        bet+=1;
+                                        nClient[nthread].player.tot_holding-=1;
                                         nClient[nthread].player.bet=bet;
-                                }
+                                    }
 
-                        // - 10
-                                if(x>70 && x< 70+55 && y>150 && y<150+55 && nClient[nthread].player.bet >= 10) { // can only be clicked while gameplay is true
+                            // + 10
+                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && nClient[nthread].player.tot_holding>bet+10) { // can only be clicked while gameplay is true
 
-                                    bet-=10;
-                                    nClient[nthread].player.tot_holding+=10;
-                                    nClient[nthread].player.bet=bet;
-                                }
+                                        bet+=10;
+                                        nClient[nthread].player.tot_holding-=10;
+                                        nClient[nthread].player.bet=bet;
+                                    }
 
-                        // - 50
-                                if(x>70 && x< 70+55 && y>215 && y<215+55 && nClient[nthread].player.bet >= 50) { // can only be clicked while gameplay is true
+                            // + 50
+                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && nClient[nthread].player.tot_holding>bet+50) { // can only be clicked while gameplay is true
 
-                                    bet-=50;
-                                    nClient[nthread].player.tot_holding+=50;
-                                    nClient[nthread].player.bet=bet;
-                                }
+                                        bet+=50;
+                                        nClient[nthread].player.tot_holding-=50;
+                                        nClient[nthread].player.bet=bet;
+                                    }
 
-                        // - 100
-                                if(x>70 && x< 70+55 && y>277 && y<277+55 && nClient[nthread].player.bet >= 100) { // can only be clicked while gameplay is true
+                            // + 100
+                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && nClient[nthread].player.tot_holding>bet+100) { // can only be clicked while gameplay is true
 
-                                    bet-=100;
-                                    nClient[nthread].player.tot_holding+=100;
-                                    nClient[nthread].player.bet=bet;
-                                }
-                    }// RIGHT MOUSE
-                    break;
-                } // case Mousedown
-            }// SWITCH
-        }// WHILE
+                                        bet+=100;
+                                        nClient[nthread].player.tot_holding-=100;
+                                        nClient[nthread].player.bet=bet;
+                                    }
+
+                            // BET BUTTON
+                                    if(x>430 && x< 430+98 && y>530 && y<530+49) {
+                                        nClient[nthread].player.bet=bet;
+                                        betSig=1;
+                                        nClient[nthread].player.bet=99;
+                                        break;
+                                    }
+
+                            }// LEFT MOUSE
+
+            // ---------------------------------------------------------------------------------------------------------
+
+                            // RIGHT MOUSE
+
+                            // - 1
+                            if (event.button.button == (SDL_BUTTON_RIGHT)){
+                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && nClient[nthread].player.bet >= 1) { // can only be clicked while gameplay is true
+
+                                            bet-=1;
+                                            nClient[nthread].player.tot_holding+=1;
+                                            nClient[nthread].player.bet=bet;
+                                    }
+
+                            // - 10
+                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && nClient[nthread].player.bet >= 10) { // can only be clicked while gameplay is true
+
+                                        bet-=10;
+                                        nClient[nthread].player.tot_holding+=10;
+                                        nClient[nthread].player.bet=bet;
+                                    }
+
+                            // - 50
+                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && nClient[nthread].player.bet >= 50) { // can only be clicked while gameplay is true
+
+                                        bet-=50;
+                                        nClient[nthread].player.tot_holding+=50;
+                                        nClient[nthread].player.bet=bet;
+                                    }
+
+                            // - 100
+                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && nClient[nthread].player.bet >= 100) { // can only be clicked while gameplay is true
+
+                                        bet-=100;
+                                        nClient[nthread].player.tot_holding+=100;
+                                        nClient[nthread].player.bet=bet;
+                                    }
+                        }// RIGHT MOUSE
+                        break;
+                    } // case Mousedown
+                }// SWITCH
+            }// While inner
+    } // While outer
 }
-
 
 void hit_stand(NCLIENT nClient[],int nthread){
 
-    int x,y,bet=0,stand=0;
+    int x,y,bet=0,stand=0,buttonSig=0;
+    while(buttonSig==0){
     while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
          switch( event.type){
 
             case SDL_QUIT:
                 nClient[nthread].player.quit=1;
                 nClient[nthread].player.stand=1;
-                send(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0); // send quit
+                send(nClient[nthread].nUser.tconsocket[1], &nClient[nthread], sizeof(NCLIENT), 0); // send quit
                // quit(nClient);
                 close(*nClient[nthread].nUser.tconsocket);
                 exit(0);
@@ -368,6 +389,7 @@ void hit_stand(NCLIENT nClient[],int nthread){
                     if(x>550 && x< 550+98 && y>530 && y<530+49) { // can only be clicked while gameplay is true
                         stand=0;
                         nClient[nthread].player.stand=stand;
+                        buttonSig=1;
                         break;
                     }
 
@@ -375,19 +397,23 @@ void hit_stand(NCLIENT nClient[],int nthread){
                     if(x>670 && x< 670+98 && y>530 && y<530+49) { // stand button
                         stand=1;
                         nClient[nthread].player.stand=stand;
+                        buttonSig=1;
                         break;
                     }
                 }// LEFT MOUSE
+
                 break;
         }// switch
 
-    }// while
+      }// inner while
+      draw(nClient,nthread,0);
+    }// outer while
 }
 
 
 int connect_to_server(NCLIENT nClient[]){
 
-    int nthread=0, test=0,client_socket=0;
+    int nthread=0, test=0;
     char buffer[100]="Not connected!";
     struct sockaddr_in dest;
     client_socket = socket(AF_INET, SOCK_STREAM, 0); assert(client_socket!=-1);
@@ -400,9 +426,7 @@ int connect_to_server(NCLIENT nClient[]){
         perror("Can't connect to server\n");
         exit(1);
     }
-
 // ---------------------------------------- CONNECTED -------------------------------------------------
-
     recv(client_socket,&nthread,sizeof(int),0); // Recive user id
     nClient[nthread].nUser.nthread=nthread;
     *nClient[nthread].nUser.tconsocket=client_socket; // place the socket in the struct
@@ -484,9 +508,6 @@ SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32
 			printf( "Unable to optimize image %s! SDL Error: %s\n", path, SDL_GetError() );
 		}
 
-
-
-
 		//Get rid of old loaded surface
 		SDL_FreeSurface( loadedSurface ); // Släng 24-bit
 	}
@@ -513,7 +534,6 @@ bool loadMedia(NCLIENT nClient[]){
     SDL_Rect    hit_Rect;
     SDL_Rect    stand_Rect;
     SDL_Rect    bet_Rect;
-    SDL_Rect    vit_Rect;
     // Positions for hit button
     hit_Rect.x=550;
     hit_Rect.y=530;
@@ -536,12 +556,15 @@ bool loadMedia(NCLIENT nClient[]){
     SDL_BlitSurface(bet_img, NULL, screen, &bet_Rect);      // bet button
     // ----------------------------------------------------------------------------------------------
 
+
+/*
     if( table_img == NULL ){
         printf( "Failed to load image!\n" );
         success = false;
     }
-
+*/
     SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+
     return success;
 }
 
