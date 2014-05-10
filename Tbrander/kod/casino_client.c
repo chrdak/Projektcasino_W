@@ -61,17 +61,20 @@ struct nClient{
 typedef struct nClient NCLIENT;
 
 
+
 /*FUNKTIONS PROTOTYPER*/
 bool loadMedia(NCLIENT nClient[]); // Function for loading images unconverted
 void SDL_initializer();
-void game_running(NCLIENT nClient[],int);
+void game_running(NCLIENT nClient[],int,PLAYER user[],DECK card[]);
 void quit(NCLIENT nClient[]);
 void display_text(NCLIENT nClient[]);
-int connect_to_server(NCLIENT nClient[]);//prototyp
+int connect_to_server(NCLIENT nClient[], PLAYER user[]);//prototyp
 void login_init();
-void bet_client(NCLIENT nClient[],int nthread);
-void hit_stand(NCLIENT nClient[],int nthread);
-void draw(NCLIENT nClient[],int nthread,int betSig);
+void bet_client(NCLIENT nClient[],int nthread,PLAYER user[]);
+void hit_stand(NCLIENT nClient[],int nthread,PLAYER user[]);
+void draw(PLAYER user[],int nthread,int betSig);
+void sendCient(NCLIENT nClient[],int nthread);
+void recvClient(NCLIENT nClient[],int nthread);
 //-------------------------------------------------
 
 /*Global variables*/
@@ -91,14 +94,16 @@ int main( int argc, char* args[] ) {
     int nthread;
     SDL_initializer();
     NCLIENT nClient[5];
+    PLAYER user[5];
+    DECK card[60];
     //login_init();
 
     if (!loadMedia(nClient)){ // Calling function for loading 24-bit images in to the memory
         printf("Cant load img.\n");
     }
-    nthread=connect_to_server(nClient);
+    nthread=connect_to_server(nClient,user);
 
-    game_running(nClient,nthread); // Game loop
+    game_running(nClient,nthread, user,card); // Game loop
     //quit(NCLIENT nClient[]);
  return 0;
 }
@@ -132,7 +137,7 @@ void display_text(NCLIENT nClient[]){
 */
 
 
-void draw(NCLIENT nClient[],int nthread,int betSig){
+void draw(PLAYER user[],int nthread,int betSig){
     int i,j;
 
     // ------------------------- DRAW GAMEBOARD, BUTTONS -------------------------------------------
@@ -181,7 +186,7 @@ void draw(NCLIENT nClient[],int nthread,int betSig){
     SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
 // -------------------------------------------------------------------------------
 
-
+/*
     for(i=0;i<5;++i){ // test each space in the array
         if(nClient[1].nUser.playerCon[i] == i){
 
@@ -200,68 +205,102 @@ void draw(NCLIENT nClient[],int nthread,int betSig){
 
         }
     }
-
+*/
     SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
 }
 
-void game_running(NCLIENT nClient[],int nthread){
+void game_running(NCLIENT nClient[],int nthread, PLAYER user[],DECK card[]){
     bool game=true;
-    int stand = 0,betSig=1;
+    int stand = 0,betSig=1,active_player=0;
     while (game==true){
 
-        draw(nClient,nthread,betSig);
-        bet_client(nClient,nthread);
-        send(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // send bet
-        draw(nClient,nthread,betSig);
+// -------------------------- BET  REQUEST FROM SERVER -------------------------------------
+        betSig=1;
+
+printf("\nBET REQ (bet: %d)\n",user[nthread].bet);
+        draw(user,nthread,betSig);
+        bet_client(nClient,nthread,user);
+        send(nClient[nthread].nUser.tconsocket[nthread], &user[nthread].bet, sizeof(user[nthread].bet), 0); // send bet
+        draw(user,nthread,betSig);
         betSig=0;
-        // LOOP väntar på bet från alla
-printf("\nBET SENT WAITING FOR OTHER BETS (bet: %d)\n",nClient[nthread].player.bet);
-        recv(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // Tar emot bet från alla
-        draw(nClient,nthread,betSig);
 
+printf("\nBET OVER (bet: %d)\n",user[nthread].bet);
+
+// -------------------------------- BET OVER -----------------------------------------------
+
+
+
+
+// ---------------------- WAITING TO RECIVE OTHER BETS -------------------------------------
+
+printf("\nBET SENT WAITING FOR OTHER BETS (bet: %d)\n",user[nthread].bet);
+
+        recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // Tar emot bet från alla
+        draw(user,nthread,betSig);
         // DIN TUR ?
-printf("\nAFTER BETS RECV, WAITING FOR TURN (bet: %d turn: %d)\n",nClient[nthread].player.bet,nClient[nthread].player.turn);
+printf("\nAFTER BETS RECV, WAITING FOR TURN (turn: %d)\n",user[nthread].turn);
 
-        while(nClient[nthread].player.turn!=nthread){
-            recv(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), MSG_DONTWAIT); // TAR EMOT TURORDNING
-            draw(nClient,nthread,betSig);
-            //printf("\n%d\n",nClient[nthread].player.turn);
+
+// ----------------------- WAITING FOR YOUR TURN -------------------------------------------
+
+printf("\nWAITING FOR TURN (turn: %d)\n",user[nthread].turn);
+
+        while(user[nthread].turn!=nthread){
+            recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // TAR EMOT TURORDNING
+            draw(user,nthread,betSig);
+
+printf("\nINSIDE YOUR TURN (turn: %d)\n",user[nthread].turn);
         }
-printf("\nYOUR TURN (turn: %d)\n",nClient[nthread].player.turn);
+// -------------------------- WAITING IS OVER ----------------------------------------------
 
-        // VÅRAN TUR
-        while(nClient[nthread].player.stand==0){
-            hit_stand(nClient,nthread);
-            send(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // send stand or hit
-            recv(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // Tar emot kort, score osv.
-            printf("\nstand: %d\n",nClient[nthread].player.stand);  // värde på stand 1 el 0
-            draw(nClient,nthread,betSig);
+
+// ---------------------------- YOUR TURN --------------------------------------------------
+
+printf("\nYOUR TURN (score: %d)\n",user[nthread].score);
+        while(user[nthread].stand==0){
+            hit_stand(nClient,nthread,user);
+printf("\nAFTER STAND Out(stand: %d)\n",user[nthread].stand);
+            send(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // send stand or hit
+            if (user[nthread].stand ==1){ break;}
+            recv(nClient[nthread].nUser.tconsocket[nthread], &card[nthread], sizeof(card[nthread]), 0); // Tar emot kort, score osv.
+            printf("\ninnan user\n");
+            recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // Tar emot kort, score osv.
+            if (user[nthread].score>=21){break;}
+printf("\nSCORE: %d\n",user[nthread].score);  // värde på stand 1 el 0
+            draw(user,nthread,betSig);
         }
-printf("\nYOUR TURN IS OVER (turn: %d)\n",nClient[nthread].player.turn);
 
-        printf("\ncash: %d\n",nClient[nthread].player.tot_holding);  // KAPITAL
-        send(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0); // send stand or hit
+        user[nthread].turn = 0;
+printf("\nYOUR TURN IS OVER (turn: %d)\n",user[nthread].turn);
 
-printf("\nWAITING FOR DEALER (turn: %d)\n",nClient[nthread].player.turn);
+// ----------------------- YOUR TURN IS OVER -----------------------------------------------
 
-        while(nClient[nthread].player.dealerTurn != 1) {
-            recv(nClient[nthread].nUser.tconsocket[nthread], &nClient[nthread], sizeof(NCLIENT), 0);
-            draw(nClient,nthread,betSig);
+// ---------------------- WAITING FOR DEALER -----------------------------------------------
+
+printf("\nWAITING FOR DEALER (turn: %d)\n",user[nthread].turn);
+
+        while(user[nthread].dealerTurn== 1) {
+            recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0);
+            draw(user,nthread,betSig);
         }
-printf("\nDEALER IS DONE (winner: %d)\n",nClient[nthread].player.winner);
+
+printf("\nDEALER IS DONE (winner: %d playerscore: %d)\n",user[nthread].winner,user[nthread].score);
+        user[nthread].bet=0;
+        user[nthread].turn=0;
+
 
     } //game loop
 }
 
 
-void bet_client(NCLIENT nClient[],int nthread){
+void bet_client(NCLIENT nClient[],int nthread,PLAYER user[]){
         int x,y,bet=0,stand=0,betSig=0;
         while(betSig==0){
             while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
 
 
                  switch( event.type){
-
+/*
                     case SDL_QUIT:
                         nClient[nthread].player.quit=1;
                         nClient[nthread].player.stand=1;
@@ -270,7 +309,7 @@ void bet_client(NCLIENT nClient[],int nthread){
                         close(*nClient[nthread].nUser.tconsocket);
                         exit(0);
                         break;
-
+*/
                     case SDL_MOUSEBUTTONDOWN:   {// button clicks
 
                             x = event.button.x; // used to know where on x-axis is currently being clicked
@@ -279,42 +318,49 @@ void bet_client(NCLIENT nClient[],int nthread){
                             if (event.button.button == (SDL_BUTTON_LEFT)){
 
                             // + 1
-                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && nClient[nthread].player.tot_holding>bet+1) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && user[nthread].tot_holding>bet+1) { // can only be clicked while gameplay is true
 
                                         bet+=1;
-                                        nClient[nthread].player.tot_holding-=1;
-                                        nClient[nthread].player.bet=bet;
+                                        user[nthread].tot_holding-=1;
+                                        user[nthread].bet=bet;
+                                        printf("\nNew bet: %d\n",user[nthread].bet);
+                                        printf("\nHoldings: %d\n",user[nthread].tot_holding);
                                     }
 
                             // + 10
-                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && nClient[nthread].player.tot_holding>bet+10) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && user[nthread].tot_holding>bet+10) { // can only be clicked while gameplay is true
 
                                         bet+=10;
-                                        nClient[nthread].player.tot_holding-=10;
-                                        nClient[nthread].player.bet=bet;
+                                        user[nthread].tot_holding-=10;
+                                        user[nthread].bet=bet;
+                                        printf("\nNew bet: %d\n",user[nthread].bet);
+                                        printf("\nHoldings: %d\n",user[nthread].tot_holding);
                                     }
 
                             // + 50
-                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && nClient[nthread].player.tot_holding>bet+50) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && user[nthread].tot_holding>bet+50) { // can only be clicked while gameplay is true
 
                                         bet+=50;
-                                        nClient[nthread].player.tot_holding-=50;
-                                        nClient[nthread].player.bet=bet;
+                                        user[nthread].tot_holding-=50;
+                                        user[nthread].bet=bet;
+                                        printf("\nNew bet: %d\n",user[nthread].bet);
+                                        printf("\nHoldings: %d\n",user[nthread].tot_holding);
                                     }
 
                             // + 100
-                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && nClient[nthread].player.tot_holding>bet+100) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && user[nthread].tot_holding>bet+100) { // can only be clicked while gameplay is true
 
                                         bet+=100;
-                                        nClient[nthread].player.tot_holding-=100;
-                                        nClient[nthread].player.bet=bet;
+                                        user[nthread].tot_holding-=100;
+                                        user[nthread].bet=bet;
+                                        printf("\nNew bet: %d\n",user[nthread].bet);
+                                        printf("\nHoldings: %d\n",user[nthread].tot_holding);
                                     }
 
                             // BET BUTTON
                                     if(x>430 && x< 430+98 && y>530 && y<530+49) {
-                                        nClient[nthread].player.bet=bet;
+                                        user[nthread].bet=bet;
                                         betSig=1;
-                                        nClient[nthread].player.bet=99;
                                         break;
                                     }
 
@@ -326,35 +372,43 @@ void bet_client(NCLIENT nClient[],int nthread){
 
                             // - 1
                             if (event.button.button == (SDL_BUTTON_RIGHT)){
-                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && nClient[nthread].player.bet >= 1) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && user[nthread].bet >= 1) { // can only be clicked while gameplay is true
 
                                             bet-=1;
-                                            nClient[nthread].player.tot_holding+=1;
-                                            nClient[nthread].player.bet=bet;
+                                            user[nthread].tot_holding+=1;
+                                            user[nthread].bet=bet;
+                                        printf("\nNew bet: %d\n",user[nthread].bet);
+                                        printf("\nHoldings: %d\n",user[nthread].tot_holding);
                                     }
 
                             // - 10
-                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && nClient[nthread].player.bet >= 10) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && user[nthread].bet >= 10) { // can only be clicked while gameplay is true
 
                                         bet-=10;
-                                        nClient[nthread].player.tot_holding+=10;
-                                        nClient[nthread].player.bet=bet;
+                                        user[nthread].tot_holding+=10;
+                                        user[nthread].bet=bet;
+                                        printf("\nNew bet: %d\n",user[nthread].bet);
+                                        printf("\nHoldings: %d\n",user[nthread].tot_holding);
                                     }
 
                             // - 50
-                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && nClient[nthread].player.bet >= 50) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && user[nthread].bet >= 50) { // can only be clicked while gameplay is true
 
                                         bet-=50;
-                                        nClient[nthread].player.tot_holding+=50;
-                                        nClient[nthread].player.bet=bet;
+                                        user[nthread].tot_holding+=50;
+                                        user[nthread].bet=bet;
+                                        printf("\nNew bet: %d\n",user[nthread].bet);
+                                        printf("\nHoldings: %d\n",user[nthread].tot_holding);
                                     }
 
                             // - 100
-                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && nClient[nthread].player.bet >= 100) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && user[nthread].bet >= 100) { // can only be clicked while gameplay is true
 
                                         bet-=100;
-                                        nClient[nthread].player.tot_holding+=100;
-                                        nClient[nthread].player.bet=bet;
+                                        user[nthread].tot_holding+=100;
+                                        user[nthread].bet=bet;
+                                        printf("\nNew bet: %d\n",user[nthread].bet);
+                                        printf("\nHoldings: %d\n",user[nthread].tot_holding);
                                     }
                         }// RIGHT MOUSE
                         break;
@@ -364,13 +418,13 @@ void bet_client(NCLIENT nClient[],int nthread){
     } // While outer
 }
 
-void hit_stand(NCLIENT nClient[],int nthread){
+void hit_stand(NCLIENT nClient[],int nthread,PLAYER user[]){
 
-    int x,y,bet=0,stand=0,buttonSig=0;
+    int x,y,bet=0,buttonSig=0;
     while(buttonSig==0){
     while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
          switch( event.type){
-
+/*
             case SDL_QUIT:
                 nClient[nthread].player.quit=1;
                 nClient[nthread].player.stand=1;
@@ -379,39 +433,43 @@ void hit_stand(NCLIENT nClient[],int nthread){
                 close(*nClient[nthread].nUser.tconsocket);
                 exit(0);
                 break;
-
-            case SDL_MOUSEBUTTONDOWN:// button clicks
+*/
+            case SDL_MOUSEBUTTONDOWN: {// button clicks
 
                 x = event.button.x; // used to know where on x-axis is currently being clicked
                 y = event.button.y; // used to know where on y-axis is currently being clicked
         //HIT BUTTON
                 if (event.button.button == (SDL_BUTTON_LEFT)){
                     if(x>550 && x< 550+98 && y>530 && y<530+49) { // can only be clicked while gameplay is true
-                        stand=0;
-                        nClient[nthread].player.stand=stand;
+
+printf("\nBEFORE HIT(stand: %d)\n",user[nthread].stand);
+                        user[nthread].stand=0;
+printf("\nAFTER HIT(stand: %d)\n",user[nthread].stand);
                         buttonSig=1;
                         break;
                     }
 
         // STAND BUTTON
                     if(x>670 && x< 670+98 && y>530 && y<530+49) { // stand button
-                        stand=1;
-                        nClient[nthread].player.stand=stand;
+printf("\nBEFORE STAND(stand: %d)\n",user[nthread].stand);
+                        user[nthread].stand=1;
+printf("\nAFTER STAND(stand: %d)\n",user[nthread].stand);
                         buttonSig=1;
                         break;
                     }
                 }// LEFT MOUSE
 
                 break;
+            }
         }// switch
 
       }// inner while
-      draw(nClient,nthread,0);
+      draw(user,nthread,0);
     }// outer while
 }
 
 
-int connect_to_server(NCLIENT nClient[]){
+int connect_to_server(NCLIENT nClient[], PLAYER user[]){
 
     int nthread=0, test=0;
     char buffer[100]="Not connected!";
@@ -429,7 +487,9 @@ int connect_to_server(NCLIENT nClient[]){
 // ---------------------------------------- CONNECTED -------------------------------------------------
     recv(client_socket,&nthread,sizeof(int),0); // Recive user id
     nClient[nthread].nUser.nthread=nthread;
-    *nClient[nthread].nUser.tconsocket=client_socket; // place the socket in the struct
+    nClient[nthread].nUser.tconsocket[nthread]=client_socket; // place the socket in the struct
+    recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread].tot_holding, sizeof(user[nthread].tot_holding),0);
+    printf("\nTOT HOLDING: %d\n", user[nthread].tot_holding);
     return nthread;
 }
 
