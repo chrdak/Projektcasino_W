@@ -59,7 +59,6 @@ typedef struct nClient NCLIENT;
 
 /*FUNKTIONS PROTOTYPER*/
 void card_init(); // Initialize the card deck
-void game_running();
 void shuffleDeck();
 void deal_init();
 void* serve_client (void* parameters);    // thread function
@@ -130,42 +129,24 @@ void deal_init(){ // Initialize nClient before we send the struct to every conne
             player0_hand[cardNr]=card[deckPosition];
             user[0].score+=card[deckPosition++].game_value;
             user[0].card_tot+=1;
-            user[0].tot_holding=7000;
-
-
 
             player1_hand[cardNr]=card[deckPosition];
             user[1].score+=card[deckPosition++].game_value;
             user[1].card_tot+=1;
-            user[1].tot_holding=7000;
-
-
-
 
             player2_hand[cardNr]=card[deckPosition];
             user[2].score+=card[deckPosition++].game_value;
             user[2].card_tot+=1;
-            user[2].tot_holding=7000;
-
-
 
             player3_hand[cardNr]=card[deckPosition];
             user[3].score+=card[deckPosition++].game_value;
             user[3].card_tot+=1;
-            user[3].tot_holding=7000;
-
-
 
             player4_hand[cardNr]=card[deckPosition];
             user[4].score+=card[deckPosition++].game_value;
             user[4].card_tot+=1;
-            user[4].tot_holding=7000;
-
 
         }
-
-    // Update the total number of connected users.
-
     /*
     X, Y positions
     Dealer = 0
@@ -188,10 +169,7 @@ void deal_init(){ // Initialize nClient before we send the struct to every conne
 
 }
 
-void game_running(){
 
-
-}
 
 void shuffleDeck(){
     int i,j;
@@ -242,7 +220,6 @@ void card_init(){
 
 void checkHandValue(int which_usr,int nHit){
     int i;
-
 
     if (deckPosition>52){
         shuffleDeck();
@@ -428,6 +405,7 @@ void* serve_client (void* parameters) {  //thread_function
     THREAD* p = (THREAD*) parameters;
     while(game==true){/* Wait for next deal */}
     switch(p->nthread) {
+
         case 0: { // Dealer
             pthread_mutex_lock(&mutex[p->nthread]); // LOCK
             for(;;){
@@ -455,15 +433,10 @@ void* serve_client (void* parameters) {  //thread_function
                     }
                 }
 
-
-
                 while(user[0].score<17){ // Dealer draws to 17
                     checkHandValue(p->nthread,++nHit);
                     }
                     send_flagDealer=1;
-
-
-
 
                 for(i=1;i<5;++i){ // Check winner
                     if(playerTurn[i]!=0){
@@ -478,18 +451,9 @@ void* serve_client (void* parameters) {  //thread_function
                     }
                 }
 
-printf("\ncase 0: CASE 1 IS DONE (CASE1 score: %d)\n",user[1].score);
-printf("\ncase 0: CASE 1 IS DONE (CASE1 bet: %d)\n",user[1].bet);
-printf("\ncase 0: CASE 1 IS DONE (CASE1 turn: %d)\n",user[1].turn);
-printf("\ncase 0: CASE 1 IS DONE (CASE1 winner: %d)\n",user[1].winner);
-printf("\ncase 0: CASE 0 IS DONE (CASE0 score: %d)\n",user[0].score);
-printf("\ncase 0: CASE 0 IS DONE (CASE0 bet: %d)\n",user[0].bet);
-printf("\ncase 0: CASE 0 IS DONE (CASE0 turn: %d)\n",user[0].turn);
-printf("\ncase 0: CASE 0 IS DONE (CASE0 winner: %d)\n",user[0].winner);
-
                 send_flagWinner=1;
                 first_deal=0;
-printf("\ncase 0: GAME OVER)\n");
+                printf("\ncase 0: GAME OVER Dealer stats: score %d, winner %d\n",user[0].score ,user[0].winner);
                 game=false;
             } // Dealer loop
             pthread_mutex_unlock(&mutex[p->nthread]);
@@ -497,50 +461,38 @@ printf("\ncase 0: GAME OVER)\n");
         }
         case 1: { // Threadfunction1/ user1
             pthread_mutex_lock(&mutex[p->nthread]);
+            user[p->nthread].tot_holding=1000;
             nClient[p->nthread].nUser.nthread=p->nthread;
             send(p->tconsocket[p->nthread],&p->nthread, sizeof(int),0); // send nthread
             int stand=0,nHit=1;
             player_tot++;
 
-
-
-            while(user[p->nthread].quit!=1){ // Game loop for the thread
+            while(user[p->nthread].quit!=1){ // Game loop for case 1
+                printf("\n************************** NEW GAME ****************************\n");
                 reset_players(1);
-                while(first_deal == 0){/* STAY HERE UNTIL GAME READY */}
-                  send(p->tconsocket[p->nthread], &user[p->nthread].tot_holding, sizeof(user[p->nthread].tot_holding), 0);
-
-        printf("\nBET REQUEST (bet: %d, Socket: %d)\n",user[p->nthread].bet,p->tconsocket[p->nthread]);
-                    recv(p->tconsocket[p->nthread], &user[p->nthread].bet, sizeof(user[p->nthread].bet), 0); // send bet
-                    ++allBetRecv;
-        printf("\nBET RECIVED (bet: %d)\n",user[p->nthread].bet);
-
+                while(first_deal == 0){ sleep(1);/* STAY HERE UNTIL GAME READY */}
+                send(p->tconsocket[p->nthread], &user[p->nthread].tot_holding, sizeof(user[p->nthread].tot_holding), 0); // Skickar kapital
+                recv(p->tconsocket[p->nthread], &user[p->nthread].bet, sizeof(user[p->nthread].bet), 0); // Tar emot bet
+                ++allBetRecv;
+                printf("\nCASE 1, Bet mottaget: %d\n",user[p->nthread].bet);
                 while(allBetRecv<player_tot){
-
-        printf("\nWHILE PLACING BETS (bet: %d)\n",user[p->nthread].bet);
-                //För att alla användare ska vara i synk väntar vi i en loop tills alla bet har kommit från samtliga spelare till servern.
+                    //För att alla användare ska vara i synk väntar vi i en loop tills alla bet har kommit från samtliga spelare till servern.
                 }
+                allBetRecv=0;
                 // send everything to the client. All players cards, bets, positions.
                 send(p->tconsocket[p->nthread], &user[p->nthread], sizeof(PLAYER), 0);
-
+                printf("\nCASE 1, väntar på tur: %d\n",user[p->nthread].turn);
                 while(turn!=p->nthread){ // wait for turn and send info while waiting
                     if (send_flagHit==1){
-
                         send(p->tconsocket[p->nthread], &user[p->nthread], sizeof(PLAYER), 0);
                         send_flagHit=0;
                     }
                 }
-        printf("\nSTAND: %d", user[p->nthread].stand);
-
-        printf("\nSTATUS OF STAND (stand: %d)\n",user[p->nthread].stand);
-
-
-
+                printf("\nCASE 1, vår tur: %d tryck hit eller stand!\n",user[p->nthread].turn);
+                if (user[p->nthread].score >=21){ user[p->nthread].stand=1;} // Om Vi fick 21 på första dealen så
                 while(user[p->nthread].stand==0){
-               //     send(p->tconsocket[p->nthread], &nClient[p->nthread], sizeof(NCLIENT), 0); // 1st, send the turn to client 2nd, the new card
-                    // recive hit, stand
-
                     recv(p->tconsocket[p->nthread], &user[p->nthread], sizeof(PLAYER), 0); // send bet // måste blocka här pga stand 1 eller 0.
-        printf("\nWHEN STAND HAS BEEN RECV (score: %d)\n",user[p->nthread].score);
+                    printf("\nCASE 1, stand mottaget: %d\n",user[p->nthread].stand);
                     if(user[p->nthread].stand==0){
                         checkHandValue(p->nthread, ++nHit); // nya kort delas ut här
                         if (user[p->nthread].score>=21){
@@ -548,34 +500,31 @@ printf("\ncase 0: GAME OVER)\n");
                             user[p->nthread].turn=0;
                             send(p->tconsocket[p->nthread], &card[p->nthread], sizeof(DECK), 0);
                             send(p->tconsocket[p->nthread], &user[p->nthread], sizeof(PLAYER), 0);
-
-        printf("\nINSIDE (IF >=21) (stand: %d score: %d)\n",user[p->nthread].stand,user[p->nthread].score);
                             send_flagHit=1;
+                            printf("\nCASE 1, Hit! Tjock: poäng: %d\n",user[p->nthread].score);
                             break;
                         }
-        printf("\nIF HIT IS RECIVED (stand: %d score: %d)\n",user[p->nthread].stand,user[p->nthread].score);
+                        printf("\nCASE 1, Hit! Ej tjock, poäng: %d tryck hit eller stand!\n",user[p->nthread].score);
                         send_flagHit=1;
                     }
-                    user[p->nthread].turn=0;
                     if(user[p->nthread].stand==0){
                         send(p->tconsocket[p->nthread], &card[p->nthread], sizeof(DECK), 0);
                         send(p->tconsocket[p->nthread], &user[p->nthread], sizeof(PLAYER), 0);
                         }
                 }
+                user[p->nthread].turn=0;
+                printf("\nCASE 1, turen är över: %d)\n",user[p->nthread].turn);
                 turn=0;
-//---------------------------------------------------------------------------------------------------------------
-        printf("\nWAITING FOR DEALER (stand: %d score: %d)\n", user[p->nthread].stand, user[p->nthread].score);
 
-                while(send_flagDealer==0){ printf("\ncase 1:  Flag %d\n",send_flagDealer); sleep(1);      /* FAST */                 }
+                while(send_flagDealer==0){ printf("\nCASE 1, väntar på dealer, din poäng: %d\n",user[p->nthread].score); sleep(1);/* FAST */ }
                     user[p->nthread].dealerTurn=0;
                     send(p->tconsocket[p->nthread], & user[p->nthread], sizeof(PLAYER), 0);
-        printf("\nAFTER DEALER (stand: %d score: %d)\n", user[p->nthread].stand, user[p->nthread].score);
-                while(send_flagWinner==0){              }
-        printf("\nWAITING FOR WINNER DECISION (winner: %d score: %d)\n", user[p->nthread].winner, user[p->nthread].score);
+                while(send_flagWinner==0){ /* VÄNTAR */   }
                     send(p->tconsocket[p->nthread], & user[p->nthread], sizeof(PLAYER), 0);
+                    printf("\nCASE 1, vinnarbeslut (1 = du vinner, 0 = dealern vinner): %d\n",user[p->nthread].winner);
                  // While not quit
-        printf("\nAFTER WINNER DECISION (winner: %d score: %d)\n", user[p->nthread].winner, user[p->nthread].score);
-        printf("\ncase 1: GAME OVER)\n");
+
+                printf("\nCASE 1, GAME OVER\n");
             }
             usr_tot=p->nthread; // When quiting
             checksock[p->nthread] = 0;

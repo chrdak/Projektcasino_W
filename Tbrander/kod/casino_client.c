@@ -211,104 +211,81 @@ void draw(PLAYER user[],int nthread,int betSig){
 
 void game_running(NCLIENT nClient[],int nthread, PLAYER user[],DECK card[]){
     bool game=true;
-    int stand = 0,betSig=1,active_player=0;
+    int betSig=1,i,bytes=0;
     while (game==true){
-
+ printf("\n************************** NEW GAME ****************************\n");
 // -------------------------- BET  REQUEST FROM SERVER -------------------------------------
         betSig=1;
-
-printf("\nBET REQ (bet: %d)\n",user[nthread].bet);
-        draw(user,nthread,betSig);
+        //draw(user,nthread,betSig);
         bet_client(nClient,nthread,user);
         send(nClient[nthread].nUser.tconsocket[nthread], &user[nthread].bet, sizeof(user[nthread].bet), 0); // send bet
-        draw(user,nthread,betSig);
+        //draw(user,nthread,betSig);
         betSig=0;
-
-printf("\nBET OVER (bet: %d)\n",user[nthread].bet);
 
 // -------------------------------- BET OVER -----------------------------------------------
 
-
-
-
 // ---------------------- WAITING TO RECIVE OTHER BETS -------------------------------------
-
-printf("\nBET SENT WAITING FOR OTHER BETS (bet: %d)\n",user[nthread].bet);
-
-        recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // Tar emot bet från alla
+        recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), MSG_DONTWAIT); // Tar emot bet från alla
         draw(user,nthread,betSig);
         // DIN TUR ?
-printf("\nAFTER BETS RECV, WAITING FOR TURN (turn: %d)\n",user[nthread].turn);
-
-
 // ----------------------- WAITING FOR YOUR TURN -------------------------------------------
-
-printf("\nWAITING FOR TURN (turn: %d)\n",user[nthread].turn);
 
         while(user[nthread].turn!=nthread){
             recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // TAR EMOT TURORDNING
             draw(user,nthread,betSig);
-
-printf("\nINSIDE YOUR TURN (turn: %d)\n",user[nthread].turn);
+            printf("\nYour turn: %d\n",user[nthread].turn);
         }
 // -------------------------- WAITING IS OVER ----------------------------------------------
 
-
 // ---------------------------- YOUR TURN --------------------------------------------------
 
-printf("\nYOUR TURN (score: %d)\n",user[nthread].score);
         while(user[nthread].stand==0){
+            printf("\nYour score: %d\n",user[nthread].score);
             hit_stand(nClient,nthread,user);
-printf("\nAFTER STAND Out(stand: %d)\n",user[nthread].stand);
             send(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // send stand or hit
             if (user[nthread].stand ==1){ break;}
             recv(nClient[nthread].nUser.tconsocket[nthread], &card[nthread], sizeof(card[nthread]), 0); // Tar emot kort, score osv.
-            printf("\ninnan user\n");
             recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // Tar emot kort, score osv.
             if (user[nthread].score>=21){break;}
-printf("\nSCORE: %d\n",user[nthread].score);  // värde på stand 1 el 0
             draw(user,nthread,betSig);
         }
-
-        user[nthread].turn = 0;
-printf("\nYOUR TURN IS OVER (turn: %d)\n",user[nthread].turn);
+        user[nthread].turn = 0; // nollställ turn när turen är över
 
 // ----------------------- YOUR TURN IS OVER -----------------------------------------------
 
 // ---------------------- WAITING FOR DEALER -----------------------------------------------
 
-printf("\nWAITING FOR DEALER (turn: %d)\n",user[nthread].turn);
-
         while(user[nthread].dealerTurn== 1) {
             recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0);
             draw(user,nthread,betSig);
         }
-
-printf("\nDEALER IS DONE (winner: %d playerscore: %d)\n",user[nthread].winner,user[nthread].score);
+        printf("\nScore: %d, Winner: %d\n",user[nthread].score,user[nthread].winner);
         user[nthread].bet=0;
-        user[nthread].turn=0;
 
+        for(i=0;i<5;++i){
+            bytes=recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), MSG_DONTWAIT); // Tar emot bet från alla
+            printf("\nGAME OVER, varv %d skräpbyte recv %d:\n",i,bytes);
+        }
 
     } //game loop
 }
 
 
 void bet_client(NCLIENT nClient[],int nthread,PLAYER user[]){
-        int x,y,bet=0,stand=0,betSig=0;
-        while(betSig==0){
+        int x,y,bet=0,stand=0,betSig=1;
+        while(betSig==1){
+            draw(user,nthread,betSig);
             while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
-
 
                  switch( event.type){
 /*
                     case SDL_QUIT:
                         nClient[nthread].player.quit=1;
                         nClient[nthread].player.stand=1;
-                        send(*nClient[nthread].nUser.tconsocket, &nClient, sizeof(NCLIENT), 0); // send quit
-                       // quit(nClient);
-                        close(*nClient[nthread].nUser.tconsocket);
+                        send(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // send stand or hit
+                        quit(nClient);
+                        close(nClient[nthread].nUser.tconsocket[nthread]);
                         exit(0);
-                        break;
 */
                     case SDL_MOUSEBUTTONDOWN:   {// button clicks
 
@@ -360,7 +337,7 @@ void bet_client(NCLIENT nClient[],int nthread,PLAYER user[]){
                             // BET BUTTON
                                     if(x>430 && x< 430+98 && y>530 && y<530+49) {
                                         user[nthread].bet=bet;
-                                        betSig=1;
+                                        betSig=0;
                                         break;
                                     }
 
@@ -426,14 +403,15 @@ void hit_stand(NCLIENT nClient[],int nthread,PLAYER user[]){
          switch( event.type){
 /*
             case SDL_QUIT:
+
                 nClient[nthread].player.quit=1;
                 nClient[nthread].player.stand=1;
-                send(nClient[nthread].nUser.tconsocket[1], &nClient[nthread], sizeof(NCLIENT), 0); // send quit
-               // quit(nClient);
-                close(*nClient[nthread].nUser.tconsocket);
+                send(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // send stand or hit
+                quit(nClient);
+                close(nClient[nthread].nUser.tconsocket[nthread]);
                 exit(0);
-                break;
 */
+
             case SDL_MOUSEBUTTONDOWN: {// button clicks
 
                 x = event.button.x; // used to know where on x-axis is currently being clicked
@@ -442,18 +420,15 @@ void hit_stand(NCLIENT nClient[],int nthread,PLAYER user[]){
                 if (event.button.button == (SDL_BUTTON_LEFT)){
                     if(x>550 && x< 550+98 && y>530 && y<530+49) { // can only be clicked while gameplay is true
 
-printf("\nBEFORE HIT(stand: %d)\n",user[nthread].stand);
                         user[nthread].stand=0;
-printf("\nAFTER HIT(stand: %d)\n",user[nthread].stand);
                         buttonSig=1;
                         break;
                     }
 
         // STAND BUTTON
                     if(x>670 && x< 670+98 && y>530 && y<530+49) { // stand button
-printf("\nBEFORE STAND(stand: %d)\n",user[nthread].stand);
+
                         user[nthread].stand=1;
-printf("\nAFTER STAND(stand: %d)\n",user[nthread].stand);
                         buttonSig=1;
                         break;
                     }
@@ -489,7 +464,6 @@ int connect_to_server(NCLIENT nClient[], PLAYER user[]){
     nClient[nthread].nUser.nthread=nthread;
     nClient[nthread].nUser.tconsocket[nthread]=client_socket; // place the socket in the struct
     recv(nClient[nthread].nUser.tconsocket[nthread], &user[nthread].tot_holding, sizeof(user[nthread].tot_holding),0);
-    printf("\nTOT HOLDING: %d\n", user[nthread].tot_holding);
     return nthread;
 }
 
