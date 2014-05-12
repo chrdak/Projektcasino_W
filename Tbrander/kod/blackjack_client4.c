@@ -41,7 +41,7 @@ struct card{
 typedef struct card DECK;
 
 struct player_pos_value{
-    int score, x1, y1,x2,y2,x3,y3,bet,tot_holding;
+    int score,x1,y1,x2,y2,x3,y3,bet,tot_holding;
     int hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om ett tilldelat korts värde
     int handPos; // cards in hand position
 };                 // Plats [0] är första tilldelade kortet osv.
@@ -222,7 +222,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 
     Uint32 start;
     const int FPS = 20;
-    playSound("david-luong_perto-de-voce-close-to-you.wav", -1);
+    playSound("sound/david-luong_perto-de-voce-close-to-you.wav", -1);
     while(running){
         start = SDL_GetTicks();
         if(gamePlay == false) {
@@ -272,7 +272,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             recv(client_socket, &receiveTurn, sizeof(receiveTurn), MSG_DONTWAIT);
 
             if(receiveTurn == myPlayerNumber) {
-                 printf("Number: %d\n", receiveTurn);
+                 printf("Number inne: %d\n", receiveTurn);
                 myTurn = true;
             }/*else{
                 recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), MSG_DONTWAIT);
@@ -282,6 +282,8 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 
             }*/
         }
+
+        printf("Number utanför: %d\n", receiveTurn);
         /*
         if(gamePlay == true && myTurn == false) {
             recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), 0);
@@ -312,8 +314,9 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                         send(client_socket, &hit, sizeof(hit), 0); // send hit message to server
                         ++cardNumberOnScreen;
                         recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), 0); // recv a card struct from server
-                         printf("card: %d\n", card[cardNumberOnScreen].game_value);
-                       playSoundEffect("cardSlide6.wav");
+                         printf("card value: %d\n", card[cardNumberOnScreen].game_value);
+                         printf("card path: %s\n", card[cardNumberOnScreen].path);
+                       playSoundEffect("sound/cardSlide6.wav");
                        for(i=0;i<3;i++) {
                             recv(client_socket, &usr[i], sizeof(usr[i]), 0); // receive user and dealer info from server
                         }

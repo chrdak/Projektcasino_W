@@ -94,35 +94,41 @@ void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
 
     int i,j;
     int cardCount = (socketNumber* 2) + 1;
+
+// Player score, handposition
     usr[0].score = 0;
     usr[1].score = 0;
+    usr[2].score = 0;
     usr[0].handPos = 0;
     usr[1].handPos = 0;
+    usr[2].handPos = 0;
 
 //player score positions
     usr[0].x2 = 565;
-    usr[1].x2 = 885;
-    usr[2].x2 = 660;
+    usr[1].x2 = 685;
+    usr[2].x2 = 425;
 
     usr[0].y2 = 10;
-    usr[1].y2 = 430;
+    usr[1].y2 = 500;
     usr[2].y2 = 500;
 
 //player card positions
     usr[0].x1 = 565;
-    usr[1].x1 = 880;
-    usr[2].x1 = 660;
+    usr[1].x1 = 685;
+    usr[2].x1 = 425;
 
     usr[0].y1 = 150;
-    usr[1].y1 = 290;
-    usr[2].y1 = 370;
+    usr[1].y1 = 400;
+    usr[2].y1 = 400;
 
 //win or lose message
+    usr[0].x3 = 565;
+    usr[0].y3 = 5;
+    usr[1].x3 = 685;
+    usr[1].y3 = 510;
+    usr[2].x3 = 425;
+    usr[2].y3 = 510;
 
-    usr[1].x3 = 885;
-
-
-    usr[1].y3 = 450;
 
     //*deckPosition = 0;
     for(i=0;i<5;i++){
