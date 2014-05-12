@@ -308,7 +308,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 
                     //hit(card,usr,dest, gamePlay,loseColor,winLoseMessage, x, y);
                             //HIT BUTTON
-                    if(x>550 && x< 550+98 && y>530 && y<530+49 && usr[myPlayerNumber].score < 21 && gamePlay == true && myTurn == true) { // can only be clicked while gameplay is true
+                    if(x>550 && x< 550+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score < 21 && gamePlay == true && myTurn == true) { // can only be clicked while gameplay is true
                         send(client_socket, &hit, sizeof(hit), 0); // send hit message to server
                         ++cardNumberOnScreen;
                         recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), 0); // recv a card struct from server
@@ -324,13 +324,13 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                         for(i=0;i<3;i++) {
                             display_score(usr,i);
                         }
-                        if(usr[myPlayerNumber].score > 21) { // if player busts show new game button
-                            gamePlay = false;
-                            display_message(usr,myPlayerNumber, "BUST");
+                        if(usr[myPlayerNumber+1].score > 21) { // if player busts show new game button
+
+                            display_message(usr,myPlayerNumber+1, "BUST");
                         }
                     }
                         // STAND BUTTON
-                    if(x>670 && x< 670+98 && y>530 && y<530+49 && usr[myPlayerNumber].score <= 21 && gamePlay == true) { // stand button
+                    if(x>670 && x< 670+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score <= 21 && gamePlay == true) { // stand button
                         send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
                         /*
                         while(usr[0].score < 17) { // receive card while server/dealer is less than 17
