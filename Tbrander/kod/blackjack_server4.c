@@ -115,7 +115,7 @@ void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
 
     usr[0].y1 = 150;
     usr[1].y1 = 290;
-    usr[2].y1 = 390;
+    usr[2].y1 = 370;
 
 //win or lose message
 
@@ -212,6 +212,8 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
     char msg[] = "Connected with server.\n";
     int message;
     bool dealCards = true;
+    bool hitting = true;
+    bool hitMe = true;
 
 
     // thread and mutex initialization
@@ -269,17 +271,24 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
          while(i==2) {
 
             //recv(tdata[0].tconsocket[0], &message, sizeof(message), 0); // receives hit, stand, newgame messages from client
-            if(dealCards == true) {
+            while(dealCards == true) {
                 newGame(usr,card,tdata,i,deckPosition,message);
                 dealCards = false;
             }
-            if(dealCards == false) {
+            while(dealCards == false && hitMe == true) {
                 for(i=0;i<2;i++){
                     send(tdata[0].tconsocket[i], &i, sizeof(i), 0);
-                    message = 0;
-                    while(message == 0){
+                    hitting = true;
+                    while(hitting == true){
                         recv(tdata[0].tconsocket[i], &message, sizeof(message), 0);
-                        hit(usr,card,tdata,2,deckPosition,message);
+                        hit(usr,card,tdata,i,deckPosition,message);
+                        if(message == 1){
+                            hitting = false;
+                        }
+
+                    }
+                    if(i == 1){
+                        hitMe == false;
 
                     }
 
@@ -326,14 +335,15 @@ void newGame(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* de
 
 void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message){
     int i,j;
+    socketNumber +=1;
     if(message == 0) { //if HIT message is received
          if(*deckPosition > 51) {
              shuffleDeck(card);
             *deckPosition = 0;
             //printf("Deckposition: %d\n", *deckPosition);
         }
-        cardRect(card,usr,deckPosition,1);
-        checkHandValue(usr, card, 1,deckPosition); // calculate client current hand
+        cardRect(card,usr,deckPosition,socketNumber);
+        checkHandValue(usr, card, socketNumber,deckPosition); // calculate client current hand
         for(i=0;i<2;i++) {
             send(tdata[0].tconsocket[i], &card[*deckPosition], sizeof(DECK), 0); // send current card to client
         }
@@ -343,7 +353,7 @@ void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPo
         }
         //send(tdata[0].tconsocket[socketNumber], (void*)&card[*deckPosition], sizeof(DECK), 0); // send card to client
         //send(tdata[0].tconsocket[socketNumber], (void*)&usr[socketNumber], sizeof(usr[socketNumber]), 0); //send current hand information to client
-        printf("Player: %d\n", usr[1].score);
+        printf("Player: %d\n", usr[socketNumber].score);
         printf("Deckposition: %d\n", *deckPosition);
     }
 }

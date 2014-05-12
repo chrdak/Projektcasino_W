@@ -192,7 +192,6 @@ void display_message(PLAYER usr[],int userNumber, char message[]){
     TTF_CloseFont(font);
 }
 
-
 void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPlayerNumber){
     int x,y,i,j;
     int hit = 0; // message to server for hit
@@ -247,7 +246,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                 //loadCard(card, cardNumberOnScreen);
                 ++newGameCount;
                 ++cardNumberOnScreen;
-            }
+                }
             for(i=0;i<3;i++) {
                     recv(client_socket, &usr[i], sizeof(usr[i]), 0); // receive user and dealer info from server
             }
@@ -264,16 +263,26 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 
 
         }
-        while(1){
-            SDL_UpdateWindowSurface(window);
-        }
 
-        if(gamePlay == true && myTurn == false) {
-            recv(client_socket, &receiveTurn, sizeof(receiveTurn), 0);
-            if(receiveTurn == myPlayerNumber) {
-                myTurn == true;
+        while(gamePlay == true && myTurn == false) {
+            if (!loadMedia(card,cardNumberOnScreen)){ // Calling function for loading 24-bit images in to the memory
+                printf("Cant load img.\n");
             }
-        }/*
+            SDL_UpdateWindowSurface(window);
+            recv(client_socket, &receiveTurn, sizeof(receiveTurn), MSG_DONTWAIT);
+
+            if(receiveTurn == myPlayerNumber) {
+                 printf("Number: %d\n", receiveTurn);
+                myTurn = true;
+            }/*else{
+                recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), MSG_DONTWAIT);
+                for(i=0;i<3;i++) {
+                            recv(client_socket, &usr[i], sizeof(usr[i]),MSG_DONTWAIT ); // receive user and dealer info from server
+                }
+
+            }*/
+        }
+        /*
         if(gamePlay == true && myTurn == false) {
             recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), 0);
             if (!loadMedia(card,cardNumberOnScreen)){ // Calling function for loading 24-bit images in to the memory
@@ -281,7 +290,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             }
 
         }*/
-        sleep(1);
+
         SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
 
         while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
@@ -303,9 +312,9 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                         send(client_socket, &hit, sizeof(hit), 0); // send hit message to server
                         ++cardNumberOnScreen;
                         recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), 0); // recv a card struct from server
-
+                         printf("card: %d\n", card[cardNumberOnScreen].game_value);
                        playSoundEffect("cardSlide6.wav");
-                       for(i=0;i<2;i++) {
+                       for(i=0;i<3;i++) {
                             recv(client_socket, &usr[i], sizeof(usr[i]), 0); // receive user and dealer info from server
                         }
 
@@ -323,6 +332,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                         // STAND BUTTON
                     if(x>670 && x< 670+98 && y>530 && y<530+49 && usr[myPlayerNumber].score <= 21 && gamePlay == true) { // stand button
                         send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
+                        /*
                         while(usr[0].score < 17) { // receive card while server/dealer is less than 17
                             ++cardNumberOnScreen;
                             recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), 0); // receive card to be displayed on dealer part of screen
@@ -345,38 +355,8 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                             display_message(usr,myPlayerNumber, "You Lose");
                         }
                         gamePlay = false; // no current game, new game button appears
-
-                    }/*
-                    if(x>0 && x< 0+80 && y>0 && y<0+40 && gamePlay == false) { // new game button
-
-                       //SDL_BlitSurface( table_img, NULL, screen, NULL );
-                        cardNumberOnScreen = 0;
-                        if (!loadMedia(card,cardNumberOnScreen)){ // Calling function for loading 24-bit images in to the memory
-                            printf("Cant load img.\n");
-                        }
-                        send(client_socket, &newGame, sizeof(newGame), 0); // new game message to server
-                        recv(client_socket, &userCount, sizeof(userCount), 0); // receives the amount of players connected
-                        dealCount = (userCount*2) + 1; // deal card to right amount of players including dealer
-                        printf("New Game\n");
-
-                            while(newGameCount < dealCount) { // first deal of cards
-
-                                recv(client_socket, &card[cardNumberOnScreen], sizeof(card[cardNumberOnScreen]), 0); // receive card from server
-                                loadCard(card,cardNumberOnScreen);
-                                ++newGameCount;
-                                ++cardNumberOnScreen;
-                            }
-                            for(i=0;i<userCount+1;i++) {
-                                    recv(client_socket, &usr[i], sizeof(usr[i]), 0); // receive user and dealer info from server
-                            }
-                            for(i=0;i<userCount+1;i++) {
-                                    display_score(usr,i); // display users and dealer score
-                            }
-
-                            newGameCount=0;
-                            gamePlay = true;
-
-                    }*/
+                        */
+                    }
                     break;
              }
         }
