@@ -289,24 +289,28 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
             }
             while(dealCards == false && hitMe == true) {
                 for(i=0;i<2;i++){
-                    send(tdata[0].tconsocket[i], &i, sizeof(i), 0);
+                    send(tdata[0].tconsocket[i], &i, sizeof(i), 0); // VILKEN SPELARE
                     hitting = true;
                     while(hitting == true){
-                        recv(tdata[0].tconsocket[i], &message, sizeof(message), 0);
+                        recv(tdata[0].tconsocket[i], &message, sizeof(message), 0); // 0= hit 1=STAND
+                        printf("\n MESSAGE: %d", message);
                         hit(usr,card,tdata,i,deckPosition,message);
+//                        if(usr[i].score >= 21){
+//                            message=1;
+//                        }
                         if(message == 1){
                             hitting = false;
                         }
-
                     }
                     if(i == 1){
-                        hitMe == false;
+                        hitMe = false;
 
                     }
 
                 }
 
             }
+            for(;;){sleep(1);printf("\nväntar\n");}
             /*
             if(message == 666){
                 close(tdata[0].tconsocket[i]);
@@ -346,7 +350,7 @@ void newGame(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* de
 }
 
 void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message){
-    int i,j;
+    int i=0,j;
     socketNumber +=1;
     if(message == 0) { //if HIT message is received
          if(*deckPosition > 51) {
@@ -356,13 +360,30 @@ void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPo
         }
         cardRect(card,usr,deckPosition,socketNumber);
         checkHandValue(usr, card, socketNumber,deckPosition); // calculate client current hand
-        for(i=0;i<2;i++) {
-            sendDeckStruct(card, deckPosition, tdata[0].tconsocket[i]); // send current card to client
-        }
-        for(i=0;i<2;i++) {
-            for(j=0;j<3;j++)
+//        for(i=0;i<2;i++) {
+            if(socketNumber == 1) {
+                i = 0;
+                sendDeckStruct(card, deckPosition, tdata[0].tconsocket[i]); // send current card to client
+            }
 
-                sendUsrStruct(usr,j, tdata[0].tconsocket[i]);
+            if(socketNumber == 2) {
+                i = 1;
+                sendDeckStruct(card, deckPosition, tdata[0].tconsocket[i]); // send current card to client
+            }
+//        }
+        for(i=0;i<2;i++) {
+//            for(j=0;j<3;j++) {
+
+                if(socketNumber == 1) {
+                    j = 1;
+                    sendUsrStruct(usr,j, tdata[0].tconsocket[0]);
+                }
+
+                    if(socketNumber == 2) {
+                        j = 2;
+                        sendUsrStruct(usr,j, tdata[0].tconsocket[1]);
+                    }
+//            }
 
         }
         //send(tdata[0].tconsocket[socketNumber], (void*)&card[*deckPosition], sizeof(DECK), 0); // send card to client
@@ -377,7 +398,7 @@ void stand(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deck
     if(message == 1){ //if STAND message is received
 
         printf("Player score: %d\n", usr[socketNumber].score);
-        while(usr[0].score < 17) {
+        while(usr[0].score < 17 && socketNumber == 1) {
 
 
 
@@ -430,12 +451,20 @@ void sendDeckStruct(DECK card[],int *deckPosition, int socketNumber) {
     char y[100];
     char gameValue[100];
 
-    sprintf(gameValue, "%d", card[*deckPosition].type);
+    sprintf(gameValue, "%d", card[*deckPosition].game_value);
     sprintf(x, "%d", card[*deckPosition].CardPos.x);
     sprintf(y, "%d", card[*deckPosition].CardPos.y);
+
+    printf("\ngame value: %d\n", card[*deckPosition].game_value);
     send(socketNumber, &gameValue, sizeof(gameValue), 0);
+
+    printf("\nx value: %d\n", card[*deckPosition].CardPos.x);
     send(socketNumber, &x, sizeof(x), 0);
+
+    printf("\ny value: %d\n", card[*deckPosition].CardPos.y);
     send(socketNumber, &y, sizeof(y), 0);
+
+    printf("\npath: %s\n", card[*deckPosition].path);
     send(socketNumber, &card[*deckPosition].path, sizeof(card[*deckPosition].path), 0);
 
 }

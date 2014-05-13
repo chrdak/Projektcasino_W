@@ -72,6 +72,7 @@ void playSound(char fileName[], int soundLoop);
 void playSoundEffect(char fileName[]);
 void recvStruct(DECK card[],int cardNumberOnScreen, int client_socket);
 void recvUsrStruct(PLAYER usr[],int user, int client_socket);
+void flushSocket(int socket);
 //-------------------------------------------------
 
 /*Global variables*/
@@ -117,6 +118,14 @@ int main( int argc, char* args[] ) {
  return 0;
 }
 
+void flushSocket(int socket) {
+    char flush[1000] = {0};
+    int byte = 1;
+    while(byte>0) {
+       byte= recv(socket, &flush, sizeof(flush), MSG_DONTWAIT);
+       printf("\n TRASH: %d\n", byte);
+    }
+}
 
 void login_init(){
 
@@ -195,7 +204,7 @@ void display_message(PLAYER usr[],int userNumber, char message[]){
 }
 
 void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPlayerNumber){
-    int x,y,i,j;
+    int x,y,i,j, count = 0;
     int hit = 0; // message to server for hit
     int stand = 1; // message to server for stand
     int bustOrLost = 2; // not using for the moment
@@ -209,7 +218,8 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     int userCount = 0;
     int dealCount = 0;
     int cardNumberOnScreen = 0;
-    printf("Welcome player %d\n", myPlayerNumber);
+
+    printf("Welcome player %d\n", myPlayerNumber+1);
 
     usr[0].score = 0;
     usr[0].handPos = 0;
@@ -263,7 +273,6 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             printf("Dealer: %d\n", usr[0].score);
             printf("Player1: %d\n", usr[1].score);
             printf("Player2: %d\n", usr[2].score);
-            sleep(1);
             newGameCount=0;
             gamePlay = true;
 
@@ -275,8 +284,8 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
                 printf("Cant load img.\n");
             }
-            recv(client_socket, &receiveTurn, sizeof(receiveTurn), MSG_DONTWAIT);
-
+            recv(client_socket, &receiveTurn, sizeof(receiveTurn), 0);
+            printf("reciveturn innehåll: %d\n", receiveTurn);
             if(receiveTurn == myPlayerNumber) {
                  printf("Number inne: %d\n", receiveTurn);
                 myTurn = true;
@@ -295,7 +304,14 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 
         }*/
 
+
+
+
+
+
+
         SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+while(myTurn == true){
 
         while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
              switch( event.type){
@@ -314,29 +330,37 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                             //HIT BUTTON
                     if(x>550 && x< 550+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score < 21 && gamePlay == true && myTurn == true) { // can only be clicked while gameplay is true
                         send(client_socket, &hit, sizeof(hit), 0); // send hit message to server
-
                         ++cardNumberOnScreen;
                         recvStruct(card,cardNumberOnScreen,client_socket); // recv a card struct from server
-                        for(i=0;i<3;i++) {
-                            recvUsrStruct(usr,i,client_socket);
+//                        for(i=0;i<3;i++) {
+                        if(count == 0) {
+                            i = myPlayerNumber+1;
+                            count ++;
                         }
+                        recvUsrStruct(usr,i,client_socket);
+                            printf("card score: %d\n", usr[i].score);
+//                        }
                         printf("card value: %d\n", card[cardNumberOnScreen].game_value);
                         printf("card path: %s\n", card[cardNumberOnScreen].path);
-                       playSoundEffect("sound/cardSlide6.wav");
-
-
+                        playSoundEffect("sound/cardSlide6.wav");
                         if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
                             printf("Cant load img.\n");
                         }
 
-                        if(usr[myPlayerNumber+1].score > 21) { // if player busts show new game button
+                        flushSocket(client_socket);
 
-                            display_message(usr,myPlayerNumber+1, "BUST");
-                        }
+                            if(usr[myPlayerNumber+1].score > 21) { // if player busts show new game button
+                                myTurn = false;
+                                display_message(usr,myPlayerNumber+1, "BUST");
+                                send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
+                            }
+
                     }
                         // STAND BUTTON
                     if(x>670 && x< 670+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score <= 21 && gamePlay == true) { // stand button
+                        printf("\nSTAND INNAN: %d\n",stand);
                         send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
+                        printf("\nSTAND EFTER: %d\n",stand);
                         myTurn = false;
                         /*
                         while(usr[0].score < 17) { // receive card while server/dealer is less than 17
@@ -365,7 +389,20 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                     }
                     break;
              }
-        }
+        } // EVENT WHILE
+        sleep(1);
+        SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+} // OUTER WHILE
+
+printf("\nTEST\n");
+
+for(;;){
+sleep(1);
+SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+
+}
+
+
         if(1000/FPS>SDL_GetTicks()-start) {
                 SDL_Delay(1000/FPS-(SDL_GetTicks()-start));
 
@@ -547,10 +584,16 @@ void recvStruct(DECK card[],int cardNumberOnScreen, int client_socket) {
     char y[100];
     char gameValue[100];
 
+
     recv(client_socket, &gameValue, sizeof(gameValue), 0);
+    puts(gameValue);
     recv(client_socket, &x, sizeof(x), 0);
+    puts(x);
     recv(client_socket, &y, sizeof(y), 0);
+    puts(y);
     recv(client_socket, &card[cardNumberOnScreen].path, sizeof(card[cardNumberOnScreen].path), 0);
+    puts(card[cardNumberOnScreen].path);
+
 
     sscanf(gameValue, "%d", &card[cardNumberOnScreen].game_value);
     sscanf(x, "%d", &card[cardNumberOnScreen].CardPos.x);
@@ -568,6 +611,7 @@ void recvUsrStruct(PLAYER usr[],int user, int client_socket) {
     char y2[100];
     char y3[100];
     char score[100];
+
 
     recv(client_socket, &x1, sizeof(x1), 0);
     recv(client_socket, &x2, sizeof(x2), 0);
