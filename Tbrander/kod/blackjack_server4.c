@@ -29,7 +29,7 @@ struct card{
     int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
     int game_value;
     int real_value;
-    SDL_Surface* card_img;
+    //SDL_Surface* card_img;
     SDL_Rect CardPos;
 };
 typedef struct card DECK;
@@ -53,6 +53,8 @@ typedef struct server_threads THREAD;
 
 
 /*FUNKTIONS PROTOTYPER*/
+void sendUsrStruct(PLAYER usr[],int user, int socketNumber);
+void sendDeckStruct(DECK card[], int *deckPosition, int socketNumber);
 void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
 void shuffleDeck(DECK card[]);
 void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition);
@@ -118,16 +120,16 @@ void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
     usr[2].x1 = 425;
 
     usr[0].y1 = 150;
-    usr[1].y1 = 400;
-    usr[2].y1 = 400;
+    usr[1].y1 = 380;
+    usr[2].y1 = 380;
 
 //win or lose message
     usr[0].x3 = 565;
     usr[0].y3 = 5;
     usr[1].x3 = 685;
-    usr[1].y3 = 510;
+    usr[1].y3 = 515;
     usr[2].x3 = 425;
-    usr[2].y3 = 510;
+    usr[2].y3 = 515;
 
 
     //*deckPosition = 0;
@@ -155,13 +157,13 @@ void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
         }
 
         for(j=0;j<2;j++) {
-            send(tdata[0].tconsocket[j], &card[*deckPosition], sizeof(DECK), 0); // send current card to client
+            sendDeckStruct(card, deckPosition, tdata[0].tconsocket[j]); // send current card to client
             printf("Deckposition: %d\n", *deckPosition);
         }
     }
     for(i=0;i<2;i++) {
         for(j=0;j<3;j++)
-            send(tdata[0].tconsocket[i], &usr[j], sizeof(usr[j]), 0); // send usr info to client
+            sendUsrStruct(usr,j, tdata[0].tconsocket[i]);
     }
 }
 
@@ -220,6 +222,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
     bool dealCards = true;
     bool hitting = true;
     bool hitMe = true;
+    bool startGame = false;
 
 
     // thread and mutex initialization
@@ -266,6 +269,9 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
         tdata[i].nthread = i;
         send(tdata[0].tconsocket[i], &i, sizeof(i), 0);
         ++i;
+        if(i==2) {
+            startGame = true;
+        }
 
         printf("Player number %d is connected\n", i);
         /*
@@ -274,7 +280,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
         }*/
         //pthread_create(&thread_id[i], NULL, &serve_client,(void *)&tdata[i]);
       //  pthread_create(&filosof[i], NULL, &philosophize, (void *)&filosof_info[i]); // Skapar nya trådar och ger dem rätt nr! NYTT
-         while(i==2) {
+         while(startGame == true) {
 
             //recv(tdata[0].tconsocket[0], &message, sizeof(message), 0); // receives hit, stand, newgame messages from client
             while(dealCards == true) {
@@ -351,11 +357,13 @@ void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPo
         cardRect(card,usr,deckPosition,socketNumber);
         checkHandValue(usr, card, socketNumber,deckPosition); // calculate client current hand
         for(i=0;i<2;i++) {
-            send(tdata[0].tconsocket[i], &card[*deckPosition], sizeof(DECK), 0); // send current card to client
+            sendDeckStruct(card, deckPosition, tdata[0].tconsocket[i]); // send current card to client
         }
         for(i=0;i<2;i++) {
             for(j=0;j<3;j++)
-                send(tdata[0].tconsocket[i], &usr[j], sizeof(usr[j]), 0); // send usr info to client
+
+                sendUsrStruct(usr,j, tdata[0].tconsocket[i]);
+
         }
         //send(tdata[0].tconsocket[socketNumber], (void*)&card[*deckPosition], sizeof(DECK), 0); // send card to client
         //send(tdata[0].tconsocket[socketNumber], (void*)&usr[socketNumber], sizeof(usr[socketNumber]), 0); //send current hand information to client
@@ -381,10 +389,10 @@ void stand(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deck
             cardRect(card,usr,deckPosition,0);
             checkHandValue(usr, card, 0, deckPosition);
             for(i=0;i<2;i++) {
-                send(tdata[0].tconsocket[i], &card[*deckPosition], sizeof(DECK), 0); // send current card to client
+                sendDeckStruct(card, deckPosition, tdata[0].tconsocket[i]); // send current card to client
             }
             //send(tdata[0].tconsocket[socketNumber], (void*)&card[*deckPosition], sizeof(DECK), 0);
-            send(tdata[0].tconsocket[socketNumber], (void*)&usr[0].score, sizeof(usr[0].score), 0);
+
             printf("Dealer: %d\n",usr[0].score );
             printf("Deckposition: %d\n", *deckPosition);
         }
@@ -399,55 +407,6 @@ void cardRect(DECK card [],PLAYER usr [], int* deckPosition, int userNumber) {
     card[*deckPosition].CardPos.h=111;
     usr[userNumber].x1 +=12;
     usr[userNumber].y1 -=12;
-}
-
-void* serve_client (void* parameters) {  //thread_function
-
-    THREAD* p = (THREAD*) parameters;
-    switch(p->nthread) {
-        case 0: { // Dealer
-            pthread_mutex_lock(&mutex[p->nthread]);
-            // The number of users playing must be known to the dealer (n_users), if there are no users -> return to main(?)
-            // which user is going to play against the dealer?, other users  must wait and will need to be notified by the dealer
-            // Send information to the client -> forward the answer to the specific thread and wait for the threads answer
-            // Make Calculations based on the answer from the thread. Compare it with your own values.
-            //  Send the necessary values back to the client/clients
-            //  Loop
-            pthread_mutex_unlock(&mutex[p->nthread]);
-            break;
-        }
-        case 1: { // Threadfunction1/ user1
-
-            pthread_mutex_lock(&mutex[p->nthread]);
-            pthread_mutex_unlock(&mutex[p->nthread]);
-            // Stay in a loop and wait for the dealer to make contact.
-            // Based  on the information ->(waiting for turn): only make changes to your surroundings and loop, your turn: calculate game vaules,and send to dealer and loop
-            // (user has exited): Reset all your values, notify the server that the slot is empty(setting i == p->nthread) and unlock your mutex -> Return to main
-            break;
-        }
-        case 2: { // Threadfunction2/ user2
-
-            pthread_mutex_lock(&mutex[p->nthread]);
-            pthread_mutex_unlock(&mutex[p->nthread]);
-            break;
-        }
-        case 3: { // Threadfunction3/ user3
-
-            pthread_mutex_lock(&mutex[p->nthread]);
-            pthread_mutex_unlock(&mutex[p->nthread]);
-            break;
-        }
-        case 4: { // Threadfunction4/ user4
-            pthread_mutex_lock(&mutex[p->nthread]);
-            pthread_mutex_unlock(&mutex[p->nthread]);
-            break;
-        }
-        default: { // Maximum number of users has been reached!
-
-        }
-
-    }
-
 }
 
 void checkHandValue(PLAYER usr[], DECK card[], int user, int* deckPosition) { // calculates current hand value
@@ -465,3 +424,48 @@ void checkHandValue(PLAYER usr[], DECK card[], int user, int* deckPosition) { //
         }
     }
 }
+
+void sendDeckStruct(DECK card[],int *deckPosition, int socketNumber) {
+    char x[100];
+    char y[100];
+    char gameValue[100];
+
+    sprintf(gameValue, "%d", card[*deckPosition].type);
+    sprintf(x, "%d", card[*deckPosition].CardPos.x);
+    sprintf(y, "%d", card[*deckPosition].CardPos.y);
+    send(socketNumber, &gameValue, sizeof(gameValue), 0);
+    send(socketNumber, &x, sizeof(x), 0);
+    send(socketNumber, &y, sizeof(y), 0);
+    send(socketNumber, &card[*deckPosition].path, sizeof(card[*deckPosition].path), 0);
+
+}
+
+void sendUsrStruct(PLAYER usr[],int user, int socketNumber) {
+    char x1[100];
+    char x2[100];
+    char x3[100];
+    char y1[100];
+    char y2[100];
+    char y3[100];
+    char score[100];
+
+    sprintf(x1, "%d", usr[user].x1);
+    sprintf(x2, "%d", usr[user].x2);
+    sprintf(x3, "%d", usr[user].x3);
+    sprintf(y1, "%d", usr[user].y1);
+    sprintf(y2, "%d", usr[user].y2);
+    sprintf(y3, "%d", usr[user].y3);
+    sprintf(score, "%d", usr[user].score);
+    send(socketNumber, &x1, sizeof(x1), 0);
+    send(socketNumber, &x2, sizeof(x2), 0);
+    send(socketNumber, &x3, sizeof(x3), 0);
+    send(socketNumber, &y1, sizeof(y1), 0);
+    send(socketNumber, &y2, sizeof(y2), 0);
+    send(socketNumber, &y3, sizeof(y3), 0);
+    send(socketNumber, &score, sizeof(score), 0);
+
+}
+
+
+
+
