@@ -28,14 +28,12 @@
 #define WINDOW_TITLE "Projekt Casino"
 
 // --------------------------------------------------------------------------------------------------
-//#pragma pack(1)
 struct card{
     char path[100];
     int game_value;
     SDL_Surface* card_img;
     SDL_Rect CardPos;
 };
-//#pragma pack(0)
 typedef struct card DECK;
 
 struct player_pos_value{
@@ -44,9 +42,8 @@ struct player_pos_value{
 typedef struct player_pos_value PLAYER;
 
 
-
 /*FUNKTIONS PROTOTYPER*/
-bool loadMedia(DECK card[], int cardNumberOnScreen, PLAYER usr[]); // Function for loading images unconverted
+bool loadMedia(DECK card[], int cardNumberOnScreen, PLAYER usr[],int); // Function for loading images unconverted
 void SDL_initializer();
 void game_running(DECK [],PLAYER [], struct sockaddr_in, int myPlayerNumber);
 void quit(DECK []);
@@ -60,27 +57,15 @@ void recvStruct(DECK card[],int cardNumberOnScreen, int client_socket);
 void recvUsrStruct(PLAYER usr[],int user, int client_socket);
 void flushSocket(int socket);
 void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[]);
-void display_bet_holding(int bet, int holdings);
+void display_bet_holding(PLAYER user[],DECK card[],int,int cardNumberOnScreen);
 //-------------------------------------------------
 
 /*Global variables*/
 SDL_Surface* loadSurface(char* path); //Loads individual image
-SDL_Surface* table_img = NULL;        //Loaded converted table image
-SDL_Surface* hit_img = NULL;          //Loaded converted hit button image
-SDL_Surface* bet_img= NULL;
-
-SDL_Surface* stand_img = NULL;        //Loaded converted stand button image
-TTF_Font *font;                       // True type font to be loaded (*.ttf)
 SDL_Window* window = NULL;            //The window
 SDL_Surface* screen = NULL;           // The window surface
-SDL_Surface* text;                    // Score to be printed
-Mix_Music *music = NULL;
-Mix_Chunk *soundEffect = NULL;
-SDL_Event event;                      //Event- for user interaction
-
-bool running = true;                 // Game loop flag
+bool running = true;                 // VIKTIG GLOBAL BOOL! ANVÄNDS SOM FLAGGA FÖR VILKET SPELBORD SOM SKA PRINTAS UT I loadMedia()
 int client_socket; // global
-char table[50]="grafik/casino_betlight_on.bmp",hit_button[50]="grafik/hit_button.bmp",stand_button[50]="grafik/stand_button.bmp",bet_button[50]="grafik/bet_button.bmp";
 int test; // assert
 
 //************************************ MAIN *********************************************
@@ -111,7 +96,7 @@ void flushSocket(int socket) {
 }
 
 void login_init(){
-
+    SDL_Event event;                      //Event- for user interaction
     SDL_Window* login_window=NULL;
     SDL_Surface* login_img = NULL;
     int SDL_test,x,y;
@@ -162,6 +147,8 @@ void login_init(){
 
 void display_score(PLAYER usr[],int userNumber){
 
+    SDL_Surface* text;                    // Score to be printed
+    TTF_Font *font;                       // True type font to be loaded (*.ttf)
     char scoreToDisplay[20]={0};
     SDL_Color text_color = {255, 245, 0};
     SDL_Rect textLocation = { usr[userNumber].x2,usr[userNumber].y2, 0, 0 }; // Position of text, relative to user
@@ -175,6 +162,8 @@ void display_score(PLAYER usr[],int userNumber){
 
 void display_message(PLAYER usr[],int userNumber, char message[]){
 
+    SDL_Surface* text;                    // Score to be printed
+    TTF_Font *font;                       // True type font to be loaded (*.ttf)
     if (userNumber==99){
         SDL_Color text_color = {247, 215, 16};
         SDL_Rect textLocation = { 480,70, 0, 0 };
@@ -208,6 +197,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     int closeSocketmessage = 666;
     int cardNumberOnScreen = 0;
     int test=0;
+    SDL_Event event;                      //Event- for user interaction
     printf("Welcome player %d\n", myPlayerNumber+1);
     usr[0].score = 0;
     usr[1].bet = 0;
@@ -217,11 +207,6 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     const int FPS = 20;
     playSound("sound/david-luong_perto-de-voce-close-to-you.wav", -1);
 
-    if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
-            printf("Cant load img.\n");
-    }
-
-
     while(running){
         start = SDL_GetTicks();
         if(gamePlay == false) {
@@ -229,27 +214,26 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             cardNumberOnScreen = 0;
             printf("New Game\n");
 
-
             bet_client(myPlayerNumber+1,usr,cardNumberOnScreen,card);
-            send(client_socket, &usr[myPlayerNumber+1].tot_holding, sizeof(usr[myPlayerNumber+1].tot_holding), 0);
-
+            send(client_socket, &usr[myPlayerNumber+1].bet, sizeof(usr[myPlayerNumber+1].bet), 0);
 
             while(newGameCount < 5) { // first deal of cards
                 recvStruct(card,cardNumberOnScreen,client_socket);
 
-                if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
+                if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
                     printf("Cant load img.\n");
                 }
                 ++newGameCount;
                 ++cardNumberOnScreen;
-                }
-                // FIRST DEAL
-                for(i=0;i<3;i++) {
-                    recvUsrStruct(usr,i,client_socket);
-                }
-                if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
-                    printf("Cant load img.\n");
-                }
+            }
+
+            // FIRST DEAL
+            for(i=0;i<3;i++) {
+                recvUsrStruct(usr,i,client_socket);
+            }
+            if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
+                printf("Cant load img.\n");
+            }
 
             printf("Dealer: %d\n", usr[0].score);
             printf("Player1: %d\n", usr[1].score);
@@ -262,9 +246,10 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 //-------------------- KLIENT 2 VÄNTAR PÅ SIN TUR  ---------------------------
 
         while(gamePlay == true && myTurn == false) {
-            if (!loadMedia(card,cardNumberOnScreen,usr)){ // LOAD CARDS, BUTTONS, GAMEBOARD
+            if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // LOAD CARDS, BUTTONS, GAMEBOARD
                 printf("Cant load img.\n");
             }
+
             test=recv(client_socket, &receive_flag, sizeof(receive_flag), 0);
             if(test == ENOTCONN){
                 perror("\nServer closed connection\n");
@@ -302,7 +287,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                         y = event.button.y; // used to know where on y-axis is currently being clicked
 
                         //HIT BUTTON
-                        if(x>550 && x< 550+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score < 21 && gamePlay == true && myTurn == true) { // can only be clicked while gameplay is true
+                        if(x>490 && x< 490+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score < 21 && gamePlay == true && myTurn == true) { // can only be clicked while gameplay is true
                             send(client_socket, &hit, sizeof(hit), 0); // send hit message to server
                             ++cardNumberOnScreen;
                             recvStruct(card,cardNumberOnScreen,client_socket); // recv a card struct from server
@@ -312,7 +297,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                             }
                             recvUsrStruct(usr,i,client_socket);
                             playSoundEffect("sound/cardSlide6.wav");
-                            if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
+                            if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
                                 printf("Cant load img.\n");
                             }
                             flushSocket(client_socket);
@@ -322,8 +307,8 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                                 send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
                             }
                         }
-                            // STAND BUTTON
-                        if(x>670 && x< 670+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score <= 21 && gamePlay == true) { // stand button
+                        // STAND BUTTON
+                        if(x>610 && x< 610+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score <= 21 && gamePlay == true) { // stand button
                             send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
                             myTurn = false;
                         }
@@ -350,12 +335,12 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                 recvUsrStruct(usr,2,client_socket);
             }
             if(receive_flag == 6) {
-                if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
+                if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
                     printf("Cant load img.\n");
                 }
                 break;
             }
-            if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
+            if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
                 printf("Cant load img.\n");
             }
         } // while client 2 i playing, recv cards if he hits, else break
@@ -365,19 +350,24 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
         ++cardNumberOnScreen;
         recvStruct(card,cardNumberOnScreen,client_socket); // receive card to be displayed on dealer part of screen
         recvUsrStruct(usr,0,client_socket); // receive current dealer score
-        if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
+        if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
             printf("Cant load img.\n");
         }
-        printf("\nDealer score: %d\n",usr[0].score);
     }
     flushSocket(client_socket);
     SDL_UpdateWindowSurface(window);
 
     if(usr[myPlayerNumber+1].score > usr[0].score && usr[myPlayerNumber+1].score < 22 || usr[0].score > 21) { // if win show yellow color rect
-        display_message(usr,myPlayerNumber+1, "You Win");
+        display_message(usr,myPlayerNumber+1, "You Win!");
+        usr[myPlayerNumber+1].tot_holding+=usr[myPlayerNumber+1].bet*2;
+        usr[myPlayerNumber+1].bet=0;
     }
     if(usr[0].score > usr[myPlayerNumber+1].score && usr[0].score < 22 || usr[0].score == usr[myPlayerNumber+1].score || usr[myPlayerNumber+1].score > 21) { // if lose show red color rect
-        display_message(usr,myPlayerNumber+1, "You Lose");
+        display_message(usr,myPlayerNumber+1, "You Lose..");
+        usr[myPlayerNumber+1].bet=0;
+    }
+    for(i=0;i<3;++i){ // nollställ allas poäng
+        usr[i].score=0;
     }
 
     flushSocket(client_socket);
@@ -389,27 +379,27 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
         display_message(usr,99, "New game in 5..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr);
+        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "New game in 4..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr);
+        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "New game in 3..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr);
+        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "New game in 2..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr);
+        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "New game in 1..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr);
+        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "Starting..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,-1,usr);
+        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
 // ------------------------------------------------------------------------
 
     if(1000/FPS>SDL_GetTicks()-start) {
@@ -475,63 +465,66 @@ SDL_Surface* loadSurface(char* path){ //Function to format the 24bit image to 32
 	return optimizedSurface;
 }
 
-bool loadMedia(DECK card[], int cardNumberOnScreen, PLAYER usr []){
+bool loadMedia(DECK card[], int cardNumberOnScreen, PLAYER usr [],int myPlayerNumber){
     //Loading success flag
     bool success = true;
     int i=0;
-
     // ------------------------------ LOAD BUTTONS AND GAMEBOARD ---------------------------------
-
-    table_img=loadSurface(table);
-    hit_img=loadSurface(hit_button);
-    stand_img=loadSurface(stand_button);
-    bet_img=loadSurface(bet_button);
-
-    SDL_Rect    hit_Rect;
-    SDL_Rect    stand_Rect;
-    SDL_Rect    bet_Rect;
-    // Positions for hit button
-    hit_Rect.x=550;
-    hit_Rect.y=530;
-    hit_Rect.w=98;
-    hit_Rect.h=49;
-    // Positions for stand button
-    stand_Rect.x=670;
-    stand_Rect.y=530;
-    stand_Rect.w=98;
-    stand_Rect.h=49;
-
-    bet_Rect.x=430;
-    bet_Rect.y=530;
-    bet_Rect.w=98;
-    bet_Rect.h=49;
-    // Draw images to screen
-
-
-    SDL_BlitSurface(table_img, NULL, screen, NULL);         // Gameboard
-    SDL_BlitScaled(hit_img, NULL, screen, &hit_Rect);       // hit button
-    SDL_BlitScaled(stand_img, NULL, screen, &stand_Rect);   // stand button
-    SDL_BlitSurface(bet_img, NULL, screen, &bet_Rect);      // bet button
+    if (running==true){
+        char game_table[50]="grafik/casino_betlight_off.bmp", hit_button[50]="grafik/hit_button.bmp",stand_button[50]="grafik/stand_button.bmp";
+        SDL_Surface* table_lightsOff_img = NULL;        //Loaded converted table image
+        SDL_Surface* hit_img = NULL;          //Loaded converted hit button image
+        SDL_Surface* stand_img = NULL;        //Loaded converted stand button image
+        table_lightsOff_img=loadSurface(game_table);
+        hit_img=loadSurface(hit_button);
+        stand_img=loadSurface(stand_button);
+        SDL_Rect    hit_Rect;
+        SDL_Rect    stand_Rect;
+        hit_Rect.x=490;
+        hit_Rect.y=530;
+        hit_Rect.w=98;
+        hit_Rect.h=49;
+        stand_Rect.x=610;
+        stand_Rect.y=530;
+        stand_Rect.w=98;
+        stand_Rect.h=49;
+        SDL_BlitSurface(table_lightsOff_img, NULL, screen, NULL);
+        SDL_BlitScaled(hit_img, NULL, screen, &hit_Rect);       // hit button
+        SDL_BlitScaled(stand_img, NULL, screen, &stand_Rect);   // stand button
+        SDL_FreeSurface(hit_img); // Frigör bild för hit-knapp bordet.
+        SDL_FreeSurface(stand_img); // Frigör bild för stand-knapp bordet.
+        SDL_FreeSurface(table_lightsOff_img);
+        }
+    if (running==false){
+        char bet_table[50]="grafik/casino_betlight_on.bmp",bet_button[50]="grafik/bet_button.bmp";
+        SDL_Surface* table_lightsOn_img = NULL;        //Loaded converted table image
+        SDL_Surface* bet_img= NULL;
+        table_lightsOn_img=loadSurface(bet_table);
+        bet_img=loadSurface(bet_button);
+        SDL_Rect    bet_Rect;
+        bet_Rect.x=550;
+        bet_Rect.y=530;
+        bet_Rect.w=98;
+        bet_Rect.h=49;
+        SDL_BlitSurface(table_lightsOn_img, NULL, screen, NULL);
+        SDL_BlitSurface(bet_img, NULL, screen, &bet_Rect);
+        SDL_FreeSurface(table_lightsOn_img);
+        SDL_FreeSurface(bet_img);
+    }
     // ----------------------------------------------------------------------------------------------
-    for(i=0;i<3;i++) {
-        display_score(usr,i); // display users and dealer score
+    if (running==true){
+        for(i=0;i<3;i++) {
+            display_score(usr,i); // display user and dealer score
+        }
     }
     for(i=0;i<cardNumberOnScreen+1;i++) {
-            card[i].card_img = SDL_LoadBMP(card[i].path);
-            SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);
-            SDL_FreeSurface(card[i].card_img);
+        card[i].card_img = SDL_LoadBMP(card[i].path);
+        SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);
+        SDL_FreeSurface(card[i].card_img);
     }
 
-    if( table_img == NULL ){
-        printf( "Failed to load image!\n" );
-        success = false;
-    }
-
-    SDL_FreeSurface(table_img); // Frigör bild för Black Jack bordet.
-    SDL_FreeSurface(hit_img); // Frigör bild för hit-knapp bordet.
-    SDL_FreeSurface(stand_img); // Frigör bild för stand-knapp bordet.
     SDL_UpdateWindowSurface(window);
-
+    display_bet_holding(usr,card,myPlayerNumber,cardNumberOnScreen);
     return success;
 }
 
@@ -549,7 +542,8 @@ void quit(DECK card[]){
 }
 
 void playSound(char fileName[], int soundLoop) {
-
+    Mix_Music *music = NULL;
+    Mix_Chunk *soundEffect = NULL;
     if(music == NULL) {
         music = Mix_LoadMUS(fileName);
         Mix_PlayMusic(music, soundLoop);
@@ -560,6 +554,8 @@ void playSound(char fileName[], int soundLoop) {
 }
 
 void playSoundEffect(char fileName[]) {
+     Mix_Music *music = NULL;
+     Mix_Chunk *soundEffect = NULL;
      soundEffect = Mix_LoadWAV(fileName);
      Mix_PlayChannel( -1,soundEffect,0);
      soundEffect = NULL;
@@ -648,17 +644,13 @@ void recvUsrStruct(PLAYER usr[],int user, int client_socket) {
 }
 
 
-
 void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[]){
         int x,y,bet=0,stand=0,betSig=1;
         SDL_Event event;
+        running=false;
+        loadMedia(card,-1,user,myPlayerNr);
         while(betSig==1){
-            sleep(1);
-            loadMedia(card,cardNumberOnScreen,user);
-            display_bet_holding(user[myPlayerNr].bet, user[myPlayerNr].tot_holding);
-            SDL_UpdateWindowSurface(window);
             while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
-
                  switch( event.type){
 /*
                     case SDL_QUIT:
@@ -677,7 +669,7 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
                             if (event.button.button == (SDL_BUTTON_LEFT)){
 
                             // + 1
-                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && user[myPlayerNr].tot_holding>bet+1) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && user[myPlayerNr].tot_holding>=1) { // can only be clicked while gameplay is true
 
                                         bet+=1;
                                         user[myPlayerNr].tot_holding-=1;
@@ -687,7 +679,7 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
                                     }
 
                             // + 10
-                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && user[myPlayerNr].tot_holding>bet+10) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && user[myPlayerNr].tot_holding>=10) { // can only be clicked while gameplay is true
 
                                         bet+=10;
                                         user[myPlayerNr].tot_holding-=10;
@@ -697,7 +689,7 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
                                     }
 
                             // + 50
-                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && user[myPlayerNr].tot_holding>bet+50) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && user[myPlayerNr].tot_holding>=50) { // can only be clicked while gameplay is true
 
                                         bet+=50;
                                         user[myPlayerNr].tot_holding-=50;
@@ -707,7 +699,7 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
                                     }
 
                             // + 100
-                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && user[myPlayerNr].tot_holding>bet+100) { // can only be clicked while gameplay is true
+                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && user[myPlayerNr].tot_holding>=100) { // can only be clicked while gameplay is true
 
                                         bet+=100;
                                         user[myPlayerNr].tot_holding-=100;
@@ -717,7 +709,7 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
                                     }
 
                             // BET BUTTON
-                                    if(x>430 && x< 430+98 && y>530 && y<530+49) {
+                                    if(x>550 && x< 550+98 && y>530 && y<530+49) {
                                         user[myPlayerNr].bet=bet;
                                         betSig=0;
                                         break;
@@ -771,25 +763,33 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
 
                                     }
                         }// RIGHT MOUSE
+                        loadMedia(card,-1,user,myPlayerNr);
+                        display_bet_holding(user,card,myPlayerNr,cardNumberOnScreen);
                         break;
                     } // case Mousedown
                 }// SWITCH
+
             }// While inner
     } // While outer
+    running=true;
 }
 
 
+void display_bet_holding(PLAYER user[],DECK card[],int myPlayerNr,int cardNumberOnScreen){
 
-
-void display_bet_holding(int bet, int holdings){
-
-
-        char player_bet[10]="";
-        char player_holdings[15]="";
-        sprintf(player_bet, "Bet: %d", bet);
-        sprintf(player_holdings, "Holding: %d", holdings);
-
-        SDL_Color text_color = {251, 218, 15};
+        SDL_Surface* text;                    // Score to be printed
+        TTF_Font *font;                       // True type font to be loaded (*.ttf)
+        char player_bet[20]="";
+        char player_holdings[20]="";
+        if(user[myPlayerNr].tot_holding>0){
+            sprintf(player_bet, "Bet: %d", user[myPlayerNr].bet);
+            sprintf(player_holdings, "Holding: %d", user[myPlayerNr].tot_holding);
+        }
+        if(user[myPlayerNr].tot_holding==0){
+            sprintf(player_bet, "Bet: %d", user[myPlayerNr].bet);
+            sprintf(player_holdings, "Insufficient funds");
+        }
+        SDL_Color text_color = {251, 218, 15}; // casinoyellow
         SDL_Rect textLocation = { 60,360, 0, 0 };
         font = TTF_OpenFont("fonts/DejaVuSans.ttf", 20); // Open true type font
         text = TTF_RenderText_Blended(font,player_bet,text_color); // Blended = smoother edges, Solid = sharper edges
@@ -803,5 +803,6 @@ void display_bet_holding(int bet, int holdings){
         SDL_BlitSurface(text, NULL, screen, &textLocation_holdings); // Draw to screen
         SDL_FreeSurface(text);
         TTF_CloseFont(font);
+        SDL_UpdateWindowSurface(window);
 }
 

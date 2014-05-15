@@ -242,9 +242,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
                 recv(tdata[0].tconsocket[i], &usr[i+1].bet, sizeof(usr[i+1].bet), 0);
             }
             printf("bet: %d\n",usr[i+1].bet);
-
             send_flag_if_hit=5;
-
             while(dealCards == true) {
                 deal_cards(usr,card,tdata, deckPosition);
                 dealCards = false;
