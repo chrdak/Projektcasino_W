@@ -28,33 +28,21 @@
 #define WINDOW_TITLE "Projekt Casino"
 
 // --------------------------------------------------------------------------------------------------
-#pragma pack(1)
+//#pragma pack(1)
 struct card{
     char path[100];
-    //int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
     int game_value;
-    //int real_value;
     SDL_Surface* card_img;
     SDL_Rect CardPos;
 };
-#pragma pack(0)
+//#pragma pack(0)
 typedef struct card DECK;
 
 struct player_pos_value{
     int score,x1,y1,x2,y2,x3,y3,bet,tot_holding;
-    int hand[11]; // Array som representerar en spelares hand, varje plats innehåller info om ett tilldelat korts värde
-    int handPos; // cards in hand position
-};                 // Plats [0] är första tilldelade kortet osv.
+};
 typedef struct player_pos_value PLAYER;
 
-struct server_threads{
-    DECK tdeck;  // thread_deck
-    PLAYER tplayer; // thread_player_position_value
-    int nthread;
-    int n_users;  // the number of users currently connected
-    int tconsocket[5]; // the threads own connectionsocket
-};
-typedef struct server_threads THREAD;
 
 
 /*FUNKTIONS PROTOTYPER*/
@@ -64,8 +52,6 @@ void game_running(DECK [],PLAYER [], struct sockaddr_in, int myPlayerNumber);
 void quit(DECK []);
 void display_score(PLAYER usr[],int userNumber);
 void connect_to_server(DECK card[], PLAYER usr[]);
-void loadCard(DECK [], int cardNumberOnScreen);
-void checkHandValue(PLAYER usr[], DECK card[], int user, int cardNumberOnScreen);
 void login_init();
 void display_message(PLAYER usr[],int userNumber, char message[]);
 void playSound(char fileName[], int soundLoop);
@@ -73,7 +59,6 @@ void playSoundEffect(char fileName[]);
 void recvStruct(DECK card[],int cardNumberOnScreen, int client_socket);
 void recvUsrStruct(PLAYER usr[],int user, int client_socket);
 void flushSocket(int socket);
-int recvOtherUserInfo(DECK card[], PLAYER usr[],int user, int client_socket,int cardNumberOnScreen);
 //-------------------------------------------------
 
 /*Global variables*/
@@ -100,20 +85,15 @@ int test; // assert
 
 int main( int argc, char* args[] ) {
     srand(time(NULL)); // Server
-    //DECK card;     // Klient, server
     PLAYER usr[5];     // Klient, server
     DECK card[60];
     TTF_Init();
-    //login_init();
-    SDL_initializer(); // klient
-    /*
-    if (!loadMedia(card,0)){ // Calling function for loading 24-bit images in to the memory
-        printf("Cant load img.\n");
-    }*/
     if(Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 4096)) {
-        printf("Unable to open audio!\n");
-        exit(1);
+            printf("Unable to open audio!\n");
+            exit(1);
     }
+    login_init();
+    SDL_initializer();
     connect_to_server(card,usr);
 
  return 0;
@@ -132,9 +112,9 @@ void login_init(){
 
     SDL_Window* login_window=NULL;
     SDL_Surface* login_img = NULL;
-    int SDL_test;
+    int SDL_test,x,y;
     char login[50]="grafik/login.bmp";
-    SDL_test=SDL_Init(SDL_INIT_VIDEO |SDL_INIT_AUDIO); assert(SDL_test==0);
+    SDL_test=SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO); assert(SDL_test==0);
 
     if (SDL_test<0){
         printf( "SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError() );
@@ -158,41 +138,41 @@ void login_init(){
     while(running){
         while( SDL_PollEvent( &event ) != 0 ) // Check if user is closing the window --> then call quit
           {
+            x = event.button.x; // used to know where on x-axis is currently being clicked
+            y = event.button.y; // used to know where on y-axis is currently being clicked
+
              if( event.type == SDL_QUIT ){
                  SDL_DestroyWindow(login_window);  // Dödar fönstret
                  running = false; // Gameloop flag false
+             }
+
+
+             if (event.type ==SDL_MOUSEBUTTONDOWN){
+                if(x>520 && x< 520+100 && y>420 && y<420+49){
+                    SDL_DestroyWindow(login_window);  // Dödar fönstret
+                    running = false; // Gameloop flag false
+                }
              }
           }
      }
      running = true;
 }
 
-
 void display_score(PLAYER usr[],int userNumber){
-     // Every users position stored in xPos, yPos
+
     char scoreToDisplay[20]={0};
     SDL_Color text_color = {255, 245, 0};
-    //TTF_Init(); // Initialize SDL_ttf
-    // RESET ------------------------------------------------------------------------
-    SDL_Rect textLocation = { usr[userNumber].x2,usr[userNumber].y2, 0, 0 }; // Position of text, relativ to user
-    //--------------------------------------------------------------------------
+    SDL_Rect textLocation = { usr[userNumber].x2,usr[userNumber].y2, 0, 0 }; // Position of text, relative to user
     sprintf(scoreToDisplay,"Sum: %d",usr[userNumber].score); // Translate int to string, storing it in scoreToDisplay
     font = TTF_OpenFont("fonts/DejaVuSans.ttf", 16); // Open true type font
     text = TTF_RenderText_Blended(font,scoreToDisplay,text_color); // Blended = smoother edges, Solid = sharper edges
-
     SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
     SDL_FreeSurface(text);
-
-    // Free text
-    //Close the font
     TTF_CloseFont(font);
 }
 
-
 void display_message(PLAYER usr[],int userNumber, char message[]){
-     // Every users position stored in xPos, yPos
 
-    // RESET ------------------------------------------------------------------------
     if (userNumber==99){
         SDL_Color text_color = {247, 215, 16};
         SDL_Rect textLocation = { 480,70, 0, 0 };
@@ -200,10 +180,9 @@ void display_message(PLAYER usr[],int userNumber, char message[]){
         text = TTF_RenderText_Blended(font,message,text_color); // Blended = smoother edges, Solid = sharper edges
         SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
         SDL_FreeSurface(text);
-        //Close the font
         TTF_CloseFont(font);
 
-    } // Position of text, relativ to user}
+    } // Position of text, relative to user
     else{
         SDL_Color text_color = {155, 16, 13};
         SDL_Rect textLocation = { usr[userNumber].x3,usr[userNumber].y3, 0, 0 }; // Position of text, relativ to user
@@ -211,73 +190,46 @@ void display_message(PLAYER usr[],int userNumber, char message[]){
         text = TTF_RenderText_Blended(font,message,text_color); // Blended = smoother edges, Solid = sharper edges
         SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
         SDL_FreeSurface(text);
-        //Close the font
         TTF_CloseFont(font);
     }
 }
 
 void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPlayerNumber){
-    int x,y,i,j, count = 0;
+    int x,y,i,j, count = 0; // x,y kordinater, i,j räknare
     int hit = 0; // message to server for hit
     int stand = 1; // message to server for stand
-    int bustOrLost = 2; // not using for the moment
-    int newGame = 3; // message to server for new game
-    int win = 4; // not using for the moment
     int newGameCount = 0; // keeps count on how many times to receive data when new game starts (deal cards function in server)
     bool gamePlay = false; // if true then game is running
     bool myTurn = false;
     bool dealerTurn=true;
     int receive_flag = 0, send_flag_klient2_done=6;
     int closeSocketmessage = 666;
-    int userCount = 0;
-    int dealCount = 0;
     int cardNumberOnScreen = 0;
-
+    int test=0;
     printf("Welcome player %d\n", myPlayerNumber+1);
-
     usr[0].score = 0;
-    usr[0].handPos = 0;
-
-    SDL_Rect newGameButton;
-    Uint32 newGamecolor = SDL_MapRGB(screen->format,0x65,0x33,0x32);
-
-    newGameButton.x = 0;
-    newGameButton.y = 0;
-    newGameButton.w = 80;
-    newGameButton.h = 40;
 
     Uint32 start;
     const int FPS = 20;
     playSound("sound/david-luong_perto-de-voce-close-to-you.wav", -1);
+
     while(running){
         start = SDL_GetTicks();
         if(gamePlay == false) {
             count=0;
-            //SDL_FillRect(screen,&newGameButton,newGamecolor); // only show new game button when there is no current hand in play
             cardNumberOnScreen = 0;
-            /*
-            if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
-                printf("Cant load img.\n");
-            }*/
-            //send(client_socket, &newGame, sizeof(newGame), 0); // new game message to server
-            //recv(client_socket, &userCount, sizeof(userCount), 0); // receives the amount of players connected
-            dealCount = (userCount*2) + 1; // deal card to right amount of players including dealer
             printf("New Game\n");
 
             while(newGameCount < 5) { // first deal of cards
-
-
                 recvStruct(card,cardNumberOnScreen,client_socket);
 
                 if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
                     printf("Cant load img.\n");
                 }
-                //loadCard(card, cardNumberOnScreen);
-
                 ++newGameCount;
                 ++cardNumberOnScreen;
-
                 }
+                // FIRST DEAL
                 for(i=0;i<3;i++) {
                     recvUsrStruct(usr,i,client_socket);
                 }
@@ -296,10 +248,14 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 //-------------------- KLIENT 2 VÄNTAR PÅ SIN TUR  ---------------------------
 
         while(gamePlay == true && myTurn == false) {
-            if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
+            if (!loadMedia(card,cardNumberOnScreen,usr)){ // LOAD CARDS, BUTTONS, GAMEBOARD
                 printf("Cant load img.\n");
             }
-            recv(client_socket, &receive_flag, sizeof(receive_flag), 0);
+            test=recv(client_socket, &receive_flag, sizeof(receive_flag), 0);
+            if(test == ENOTCONN){
+                perror("\nServer closed connection\n");
+
+            }
             // Tar emot kort och poäng
             if (receive_flag==5){
                 flushSocket(client_socket);
@@ -316,7 +272,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 
         SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
 
-        while(myTurn == true){
+        while(myTurn == true){ // GAME LOOP
             while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
                  switch( event.type){
                     case SDL_QUIT:
@@ -326,6 +282,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                         close(client_socket);
                         exit(0);
                         break;
+
                     case SDL_MOUSEBUTTONDOWN:// button clicks
                         x = event.button.x; // used to know where on x-axis is currently being clicked
                         y = event.button.y; // used to know where on y-axis is currently being clicked
@@ -340,15 +297,11 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                                 count ++;
                             }
                             recvUsrStruct(usr,i,client_socket);
-                            printf("card score: %d\n", usr[i].score);
-                            printf("card value: %d\n", card[cardNumberOnScreen].game_value);
-                            printf("card path: %s\n", card[cardNumberOnScreen].path);
                             playSoundEffect("sound/cardSlide6.wav");
                             if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
                                 printf("Cant load img.\n");
                             }
                             flushSocket(client_socket);
-
                             if(usr[myPlayerNumber+1].score > 21) { // if player busts show new game button
                                 myTurn = false;
                                 display_message(usr,myPlayerNumber+1, "BUST");
@@ -357,26 +310,24 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                         }
                             // STAND BUTTON
                         if(x>670 && x< 670+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score <= 21 && gamePlay == true) { // stand button
-                            printf("\nSTAND INNAN: %d\n",stand);
                             send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
-                            printf("\nSTAND EFTER: %d\n",stand);
                             myTurn = false;
                         }
                         break;
                  }
             } // EVENT WHILE
-            sleep(1);
             SDL_UpdateWindowSurface(window);
     } // OUTER WHILE
-
-    printf("\nSpelare %d klar! Väntar på andra klienten...\n",myPlayerNumber+1);
 
     if (myPlayerNumber+1==1){
 
         while(1) {
             SDL_UpdateWindowSurface(window);
             printf("\nSpelare %d väntar på flagga från klient 2\n",myPlayerNumber+1);
-            recv(client_socket, &receive_flag, sizeof(receive_flag), 0);
+            test=recv(client_socket, &receive_flag, sizeof(receive_flag), 0);
+            if(test == ENOTCONN){
+                perror("\nServer closed connection\n");
+            }
             // Tar emot kort och poäng
             printf("\nSpelare %d tog emot flagga %d\n",myPlayerNumber+1,receive_flag);
             if (receive_flag==5){
@@ -396,9 +347,6 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
         } // while client 2 i playing, recv cards if he hits, else break
     }// if user 0
 
-
-    printf("SPELARE %d VÄNTAR PÅ DEALER\n",myPlayerNumber+1);
-
     while(usr[0].score < 17) { // receive card while server/dealer is less than 17
         ++cardNumberOnScreen;
         recvStruct(card,cardNumberOnScreen,client_socket); // receive card to be displayed on dealer part of screen
@@ -411,13 +359,10 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     flushSocket(client_socket);
     SDL_UpdateWindowSurface(window);
 
-
     if(usr[myPlayerNumber+1].score > usr[0].score && usr[myPlayerNumber+1].score < 22 || usr[0].score > 21) { // if win show yellow color rect
-
         display_message(usr,myPlayerNumber+1, "You Win");
     }
     if(usr[0].score > usr[myPlayerNumber+1].score && usr[0].score < 22 || usr[0].score == usr[myPlayerNumber+1].score || usr[myPlayerNumber+1].score > 21) { // if lose show red color rect
-
         display_message(usr,myPlayerNumber+1, "You Lose");
     }
 
@@ -457,10 +402,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             SDL_Delay(1000/FPS-(SDL_GetTicks()-start));
     }
 
-    printf("\nSpelare %d, Game Over!\n",myPlayerNumber+1);
-
     } // GAME LOOP
-
 }
 
 void connect_to_server(DECK card[], PLAYER usr[]){
@@ -477,6 +419,7 @@ void connect_to_server(DECK card[], PLAYER usr[]){
 }
 
 void SDL_initializer(){
+
 
     // Gameboard window created
     window = SDL_CreateWindow(
@@ -588,28 +531,6 @@ void quit(DECK card[]){
     SDL_Quit();
 }
 
-void loadCard(DECK card [], int cardNumberOnScreen) {
-     card[cardNumberOnScreen].card_img = loadSurface(card[cardNumberOnScreen].path);
-     SDL_BlitScaled(card[cardNumberOnScreen].card_img, NULL, screen, &card[cardNumberOnScreen].CardPos);
-     SDL_FreeSurface(card[cardNumberOnScreen].card_img);
-}
-
-void checkHandValue(PLAYER usr[], DECK card[], int user, int cardNumberOnScreen) { // calculates current hand value
-    usr[user].hand[ usr[user].handPos ] = card[cardNumberOnScreen].game_value; // stores current card value in postion j of hand array
-    ++usr[user].handPos;
-    usr[user].score +=card[cardNumberOnScreen].game_value;
-    int l;
-    if(usr[user].score > 21) { // if current score is greater than 21
-        for(l=0;l<usr[user].handPos+1;l++){ //if current hand has card equal to 11 and player score is greater than 21
-            if(usr[user].hand[l] == 11 && usr[user].score > 21){
-                usr[user].score -= 10; // decrement total score with 10
-                usr[user].hand[l] = 1; // ace in hand gets the value 1
-            }
-
-        }
-    }
-}
-
 void playSound(char fileName[], int soundLoop) {
 
     if(music == NULL) {
@@ -632,20 +553,24 @@ void recvStruct(DECK card[],int cardNumberOnScreen, int client_socket) {
     char x[100];
     char y[100];
     char gameValue[100];
+    int test = 0;
 
-    recv(client_socket, &gameValue, sizeof(gameValue), 0);
-    printf("gamevalue: ");
-    puts(gameValue);
-    recv(client_socket, &x, sizeof(x), 0);
-    printf("x: ");
-    puts(x);
-    recv(client_socket, &y, sizeof(y), 0);
-    printf("y: ");
-    puts(y);
-    recv(client_socket, &card[cardNumberOnScreen].path, sizeof(card[cardNumberOnScreen].path), 0);
-    printf("path: ");
-    puts(card[cardNumberOnScreen].path);
-
+    test = recv(client_socket, &gameValue, sizeof(gameValue), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &x, sizeof(x), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &y, sizeof(y), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &card[cardNumberOnScreen].path, sizeof(card[cardNumberOnScreen].path), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
 
     sscanf(gameValue, "%d", &card[cardNumberOnScreen].game_value);
     sscanf(x, "%d", &card[cardNumberOnScreen].CardPos.x);
@@ -656,6 +581,7 @@ void recvStruct(DECK card[],int cardNumberOnScreen, int client_socket) {
 }
 
 void recvUsrStruct(PLAYER usr[],int user, int client_socket) {
+
     char x1[100];
     char x2[100];
     char x3[100];
@@ -663,22 +589,36 @@ void recvUsrStruct(PLAYER usr[],int user, int client_socket) {
     char y2[100];
     char y3[100];
     char score[100];
+    int test=0;
 
-
-    recv(client_socket, &x1, sizeof(x1), 0);
-    printf("\nx1: %s\n",x1);
-    recv(client_socket, &x2, sizeof(x2), 0);
-    printf("\nx2: %s\n",x2);
-    recv(client_socket, &x3, sizeof(x3), 0);
-    printf("\nx3: %s\n",x3);
-    recv(client_socket, &y1, sizeof(y1), 0);
-    printf("\ny1: %s\n",y1);
-    recv(client_socket, &y2, sizeof(y2), 0);
-    printf("\ny2: %s\n",y2);
-    recv(client_socket, &y3, sizeof(y3), 0);
-    printf("\ny2: %s\n",y3);
-    recv(client_socket, &score, sizeof(score), 0);
-    printf("\nscore: %s\n",score);
+    test = recv(client_socket, &x1, sizeof(x1), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &x2, sizeof(x2), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &x3, sizeof(x3), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &y1, sizeof(y1), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &y2, sizeof(y2), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &y3, sizeof(y3), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
+    test = recv(client_socket, &score, sizeof(score), 0);
+    if(test == ENOTCONN){
+        perror("\nServer closed connection\n");
+    }
 
     sscanf(x1, "%d", &usr[user].x1);
     sscanf(x2, "%d", &usr[user].x2);
@@ -687,57 +627,7 @@ void recvUsrStruct(PLAYER usr[],int user, int client_socket) {
     sscanf(y1, "%d", &usr[user].y1);
     sscanf(y2, "%d", &usr[user].y2);
     sscanf(y3, "%d", &usr[user].y3);
-
     sscanf(score, "%d", &usr[user].score);
 }
 
 
-    // Detta ska ej bort!!
-//int recvOtherUserInfo(DECK card[], PLAYER usr[],int user, int client_socket,int cardNumberOnScreen){
-//
-//    int bytes=1;
-//    char x[50];
-//    char y[50];
-//    char gameValue[50];
-//    char x1[50];
-//    char x2[50];
-//    char x3[50];
-//    char y1[50];
-//    char y2[50];
-//    char y3[50];
-//    char score[50];
-//    flushSocket(client_socket);
-////    while (bytes>0){
-//        bytes=recv(client_socket, &x1, sizeof(x1), 0);
-//        bytes=recv(client_socket, &x2, sizeof(x2), 0);
-//        bytes=recv(client_socket, &x3, sizeof(x3), 0);
-//        bytes=recv(client_socket, &y1, sizeof(y1), 0);
-//        bytes=recv(client_socket, &y2, sizeof(y2), 0);
-//        bytes=recv(client_socket, &y3, sizeof(y3), 0);
-//        bytes=recv(client_socket, &score, sizeof(score), 0);
-//        bytes=recv(client_socket, &gameValue, sizeof(gameValue), 0);
-//        bytes=recv(client_socket, &x, sizeof(x), 0);
-//        bytes=recv(client_socket, &y, sizeof(y), 0);
-//        bytes=recv(client_socket, &card[cardNumberOnScreen].path, sizeof(card[cardNumberOnScreen].path), 0);
-//
-//        puts(card[cardNumberOnScreen].path);
-//
-//        sscanf(x1, "%d", &usr[user].x1);
-//        sscanf(x2, "%d", &usr[user].x2);
-//        sscanf(x3, "%d", &usr[user].x3);
-//        sscanf(y1, "%d", &usr[user].y1);
-//        sscanf(y2, "%d", &usr[user].y2);
-//        sscanf(y3, "%d", &usr[user].y3);
-//
-//        sscanf(score, "%d", &usr[user].score);
-//        sscanf(gameValue, "%d", &card[cardNumberOnScreen].game_value);
-//        sscanf(x, "%d", &card[cardNumberOnScreen].CardPos.x);
-//        sscanf(y, "%d", &card[cardNumberOnScreen].CardPos.y);
-//        card[cardNumberOnScreen].CardPos.w=75;
-//        card[cardNumberOnScreen].CardPos.h=111;
-//        cardNumberOnScreen++;
-////    }
-//
-//    return cardNumberOnScreen;
-//
-//}

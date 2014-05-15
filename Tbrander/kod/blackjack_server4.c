@@ -17,19 +17,14 @@
 #include <netinet/in.h>
 #include <pthread.h>
 //#include "lib/server.h"
-//#include <assert.h>
-
 #define PORTNUM 6578
 #define SOCK_PATH "Casino_socket"
 
 // --------------------------------------------------------------------------------------------------
-#pragma pack(1)
+
 struct card{
     char path[100];
-    int type; //(Back piece=0, Hearts=1, Clubbs=2, Diamonds=3, Spades=4)
     int game_value;
-    int real_value;
-    //SDL_Surface* card_img;
     SDL_Rect CardPos;
 };
 typedef struct card DECK;
@@ -42,38 +37,27 @@ struct player_pos_value{
 typedef struct player_pos_value PLAYER;
 
 struct server_threads{
-#pragma pack(0)
-    DECK tdeck;  // thread_deck
-    PLAYER tplayer; // thread_player_position_value
-    int nthread;
-    int n_users;  // the number of users currently connected
     int tconsocket[5]; // the threads own connectionsocket
 };
 typedef struct server_threads THREAD;
 
 
 /*FUNKTIONS PROTOTYPER*/
+
 void sendUsrStruct(PLAYER usr[],int user, int socketNumber);
 void sendDeckStruct(DECK card[], int *deckPosition, int socketNumber);
 void card_init(DECK card[],PLAYER usr[]); // Initialize the card deck
 void shuffleDeck(DECK card[]);
-void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition,int player_deckPos[]);
+void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int* deckPosition);
 void server(DECK card[], PLAYER usr[], int* deckPosition);
 void* serve_client (void* parameters);    // thread function
 void checkHandValue(PLAYER usr[], DECK card[], int user, int* deckPosition);
-void cardRect(DECK card [],PLAYER usr [], int* deckPosition, int userNumber,int player_deckPos[]);
+void cardRect(DECK card [],PLAYER usr [], int* deckPosition, int userNumber);
 void sendUserInfo(DECK card[], PLAYER usr[], THREAD tdata[],int player_deckPos[]);
+void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message);
+void dealerTurn(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message);
+//-----------------------------------------------------------------------------------------------------------------------
 
-//HIT,STAND,NEW GAME Functions
-void newGame(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message,int player_deckPos[]);
-void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message,int player_deckPos[]);
-void dealerTurn(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message,int player_deckPos[]);
-//-------------------------------------------------
-
-/*Global variables*/
-pthread_mutex_t mutex[5];             // An global array of 5 mutexes
-int consocket;
-int test;
 //************************************ MAIN *********************************************
 
 int main( int argc, char* args[] ) {
@@ -86,17 +70,16 @@ int main( int argc, char* args[] ) {
     *deckPosition = 0; // current card playing position in deck
     card_init(card,usr); // // Klient, server
     shuffleDeck(card); // Server
+    while(1){
     server(card,usr,deckPosition);
-
+    }
     return 0;
 }
 //***************************************************************************************
 
-void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition,int player_deckPos[]){
+void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int* deckPosition){
 
     int i,j;
-    int cardCount = (socketNumber* 2) + 1;
-
 // Player score, handposition
     usr[0].score = 0;
     usr[1].score = 0;
@@ -142,17 +125,17 @@ void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
 
         // Rectangles for positioning
         if(i==0) { //dealar first card
-            cardRect(card,usr,deckPosition,0,player_deckPos);
+            cardRect(card,usr,deckPosition,0);
             checkHandValue(usr, card, 0, deckPosition);
         }
 
         if(i>0 && i < 3) { //player second and third card
-            cardRect(card,usr,deckPosition,1,player_deckPos);
+            cardRect(card,usr,deckPosition,1);
             checkHandValue(usr, card, 1, deckPosition);
         }
 
         if(i>2 && i < 5) { //player second and third card
-            cardRect(card,usr,deckPosition,2,player_deckPos);
+            cardRect(card,usr,deckPosition,2);
             checkHandValue(usr, card, 2, deckPosition);
         }
 
@@ -181,34 +164,24 @@ void shuffleDeck(DECK card[]){
 void card_init(DECK card [], PLAYER usr[]){
     int i;
     int gameValue = 1;
-    int realValue = 1;
 
     for (i=0;i<54;++i){
         sprintf(card[i].path,"grafik/cards/%d.bmp",i);
         if(i > 1 && i < 10 || i > 14 && i < 23 || i > 27 && i < 36 || i > 40 && i < 49){ // all cards between 2 and 9
             card[i].game_value=gameValue;
-            card[i].real_value=realValue;
-            card[i].type=i/13 +1;
         }
 
         if (i>9 && i<14 || i>22 && i<27 || i>35 && i<40 || i>48 && i<53){ // All tens, jacks, queens and kings equal 10
             card[i].game_value = 10;
-            card[i].real_value = realValue;
-            card[i].type=i/14 +1;
         }
 
         if (i==1 || i==14 || i==27 || i==40){ // ACE:s
             card[i].game_value=11;
-            card[i].type=i/13 +1;
             gameValue = 1;
-            realValue = 1;
-            card[i].real_value=1;
         }
-
-        ++realValue;
         ++gameValue;
-        card[53].real_value=0;card[53].type=0;card[53].game_value=0;
-        //printf(" Real Value = %d    Type = %d    Value = %d      Path = %s \n ",card[i].real_value,card[i].type,card[i].game_value, card[i].path);
+        card[53].game_value=0;
+
     }
 }
 
@@ -219,21 +192,18 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
     struct sockaddr_in serv, dest;
     char msg[] = "Connected with server.\n";
     int message;
+    int consocket;
     int player_deckPos[22]={0};
     int send_flag_if_hit=5; // send flag to waiting client so he can recv the card the playing client recived
     bool dealCards = true;
     bool hitting = true;
     bool hitMe = true;
     bool startGame = false;
-
+    bool quit = false;
+    int test = 0;
 
     // thread and mutex initialization
     THREAD tdata[5]; // this is the threads individual data(struct server_threads)
-    pthread_t thread_id[5];  // thread ID given to 5 elements in the array
-    for(i = 0; i < 5; i++)
-    {
-        pthread_mutex_init (&mutex[i], NULL);// initialize mutex i where i: 0..4
-    }
     i = 0; // reseting the variable for future use
 
     int pid=getpid();
@@ -248,7 +218,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
 
 
     //Main-Accept loop
-    while(1) {
+    while(quit==false) {
         consocket = accept(listen_socket, (struct sockaddr *)&dest, &socksize);
         if(consocket == -1) {  // if accept fails to initialize connection -> return value == -1
             continue;
@@ -256,8 +226,6 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
         printf("Incoming connection\n");
 
         tdata[0].tconsocket[i] = consocket;
-        tdata[0].n_users = i;  // the number of users currently connected must be known to thread[0]/Dealer
-        tdata[i].nthread = i;
         send(tdata[0].tconsocket[i], &i, sizeof(i), 0);
         ++i;
         if(i==2) {
@@ -270,7 +238,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
              send_flag_if_hit=5;
 
             while(dealCards == true) {
-                newGame(usr,card,tdata,i,deckPosition,message,player_deckPos);
+                deal_cards(usr,card,tdata, deckPosition);
                 dealCards = false;
             }
             while(dealCards == false && hitMe == true) {
@@ -278,11 +246,17 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
                     send(tdata[0].tconsocket[i], &i, sizeof(i), 0); // VILKEN SPELARE
                     hitting = true;
                     while(hitting == true){
-                        recv(tdata[0].tconsocket[i], &message, sizeof(message), 0); // 0= hit 1=STAND
+                        test = recv(tdata[0].tconsocket[i], &message, sizeof(message), 0); // 0= hit 1=STAND
+                        if(test == ENOTCONN){
+                            send(tdata[0].tconsocket[1], &test, sizeof(test), 0);
+                            send(tdata[0].tconsocket[0], &test, sizeof(test), 0);
+                            return;
+                        }
+                        if (message==666){quit=true; message=1;}
                         if(i==0 && message==0){send(tdata[0].tconsocket[1], &send_flag_if_hit, sizeof(send_flag_if_hit), 0);}
                         if(i==1 && message==0){send(tdata[0].tconsocket[0], &send_flag_if_hit, sizeof(send_flag_if_hit), 0);}
                         printf("\n MESSAGE: %d", message);
-                        hit(usr,card,tdata,i,deckPosition,message,player_deckPos);
+                        hit(usr,card,tdata,i,deckPosition,message);
 
                         if(message == 1){
                             hitting = false;
@@ -294,41 +268,27 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
                 }
             } // GAMELOOP för klientspel
 
-            printf("\nSERV. --> FLAGGA 6 TILL K.1\n");
-
             send_flag_if_hit=6;
             send(tdata[0].tconsocket[0], &send_flag_if_hit, sizeof(send_flag_if_hit), 0);
-            //sleep(1);
-            dealerTurn(usr,card,tdata,0,deckPosition,1,player_deckPos);
-
-
-
+            dealerTurn(usr,card,tdata,0,deckPosition,1);
+            if(quit==true){
+                startGame=false;
+                close(tdata[0].tconsocket[0]);
+                close(tdata[0].tconsocket[1]);
+                return;
+            }
             sleep(5);
             dealCards = true;
             hitting = true;
             hitMe = true;
 
         } // START GAME
+
     } // ACCEPT LOOP
 
 }
 
-void newGame(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message,int player_deckPos[]) {
-    int i;
-    //if(message == 3) { //if New game message is received from client
-        /*
-        for(i=1;i<socketNumber+1;i++) {
-            send(tdata[0].tconsocket[i], &socketNumber, sizeof(socketNumber), 0);
-        }*/
-        deal_cards(usr,card,tdata, socketNumber, deckPosition,player_deckPos);
-        printf("New Game\n");
-        printf("Dealer: %d\n", usr[0].score);
-        printf("Player1: %d\n", usr[1].score);
-        printf("Player2: %d\n", usr[2].score);
-    //}
-}
-
-void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message,int player_deckPos[]){
+void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message){
     int i=0,j;
     socketNumber +=1;
     if(message == 0) { //if HIT message is received
@@ -336,21 +296,19 @@ void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPo
              shuffleDeck(card);
             *deckPosition = 0;
         }
-        cardRect(card,usr,deckPosition,socketNumber,player_deckPos);
+        cardRect(card,usr,deckPosition,socketNumber);
         checkHandValue(usr, card, socketNumber,deckPosition); // calculate client current hand
         for(i=0;i<2;i++) {
             sendDeckStruct(card, deckPosition, tdata[0].tconsocket[i]); // send current card to client
-            sleep(1);
+            sleep(1); // LETS CLIENT 2 Flush his socket
         }
         for(i=0;i<2;i++) {
                 sendUsrStruct(usr,socketNumber, tdata[0].tconsocket[i]);
         }
-        printf("Player: %d\n", usr[socketNumber].score);
-        printf("Deckposition: %d\n", *deckPosition);
     }
 }
 
-void dealerTurn(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message,int player_deckPos[]) {
+void dealerTurn(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message) {
     int i;
     if(message == 1){ //if STAND message is received
 
@@ -359,42 +317,20 @@ void dealerTurn(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
             if(*deckPosition>51) {
                 shuffleDeck(card);
                 *deckPosition=0;
-                //printf("Deckposition: %d\n", *deckPosition);
             }
-            cardRect(card,usr,deckPosition,0,player_deckPos);
+            cardRect(card,usr,deckPosition,0);
             checkHandValue(usr, card, 0, deckPosition);
             for(i=0;i<2;i++) {
                 sendDeckStruct(card, deckPosition, tdata[0].tconsocket[i]); // send current card to client
                 sendUsrStruct(usr,0, tdata[0].tconsocket[i]);
             }
-
-            //send(tdata[0].tconsocket[socketNumber], (void*)&card[*deckPosition], sizeof(DECK), 0);
-
-            printf("Dealer: %d\n",usr[0].score );
-            printf("Deckposition: %d\n", *deckPosition);
-            sleep(1);
+            sleep(1); // Card display delay
         }
     }
 }
 
-void cardRect(DECK card [],PLAYER usr [], int* deckPosition, int userNumber,int player_deckPos[]) {
+void cardRect(DECK card [],PLAYER usr [], int* deckPosition, int userNumber) {
     int i=0;
-    /*
-    if (userNumber==0){
-        for(i=0;i<12;++i){
-            if (player_deckPos[i]!=0){
-                player_deckPos[i]=*deckPosition;
-            }
-        }
-    }
-    if (userNumber==1){
-        for(i=12;i<23;++i){
-            if (player_deckPos[i]!=0){
-                player_deckPos[i]=*deckPosition;
-            }
-        }
-    }
-    */
     *deckPosition += 1;
     card[*deckPosition].CardPos.x= usr[userNumber].x1;
     card[*deckPosition].CardPos.y= usr[userNumber].y1;
@@ -415,7 +351,6 @@ void checkHandValue(PLAYER usr[], DECK card[], int user, int* deckPosition) { //
                 usr[user].score -= 10; // decrement total score with 10
                 usr[user].hand[i] = 1; // ace in hand gets the value 1
             }
-
         }
     }
 }
@@ -429,18 +364,10 @@ void sendDeckStruct(DECK card[],int *deckPosition, int socketNumber) {
     sprintf(x, "%d", card[*deckPosition].CardPos.x);
     sprintf(y, "%d", card[*deckPosition].CardPos.y);
 
-    printf("\ngame value: %d\n", card[*deckPosition].game_value);
     send(socketNumber, &gameValue, sizeof(gameValue), 0);
-
-    printf("\nx value: %d\n", card[*deckPosition].CardPos.x);
     send(socketNumber, &x, sizeof(x), 0);
-
-    printf("\ny value: %d\n", card[*deckPosition].CardPos.y);
     send(socketNumber, &y, sizeof(y), 0);
-
-    printf("\npath: %s\n", card[*deckPosition].path);
     send(socketNumber, &card[*deckPosition].path, sizeof(card[*deckPosition].path), 0);
-
 }
 
 void sendUsrStruct(PLAYER usr[],int user, int socketNumber) {
