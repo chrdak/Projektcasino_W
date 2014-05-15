@@ -59,6 +59,8 @@ void playSoundEffect(char fileName[]);
 void recvStruct(DECK card[],int cardNumberOnScreen, int client_socket);
 void recvUsrStruct(PLAYER usr[],int user, int client_socket);
 void flushSocket(int socket);
+void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[]);
+void display_bet_holding(int bet, int holdings);
 //-------------------------------------------------
 
 /*Global variables*/
@@ -76,7 +78,7 @@ Mix_Music *music = NULL;
 Mix_Chunk *soundEffect = NULL;
 SDL_Event event;                      //Event- for user interaction
 
-_Bool running = true;                 // Game loop flag
+bool running = true;                 // Game loop flag
 int client_socket; // global
 char table[50]="grafik/casino_betlight_on.bmp",hit_button[50]="grafik/hit_button.bmp",stand_button[50]="grafik/stand_button.bmp",bet_button[50]="grafik/bet_button.bmp";
 int test; // assert
@@ -208,10 +210,17 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     int test=0;
     printf("Welcome player %d\n", myPlayerNumber+1);
     usr[0].score = 0;
+    usr[1].bet = 0;
+    usr[2].bet = 0;
 
     Uint32 start;
     const int FPS = 20;
     playSound("sound/david-luong_perto-de-voce-close-to-you.wav", -1);
+
+    if (!loadMedia(card,cardNumberOnScreen,usr)){ // Calling function for loading 24-bit images in to the memory
+            printf("Cant load img.\n");
+    }
+
 
     while(running){
         start = SDL_GetTicks();
@@ -219,6 +228,11 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             count=0;
             cardNumberOnScreen = 0;
             printf("New Game\n");
+
+
+            bet_client(myPlayerNumber+1,usr,cardNumberOnScreen,card);
+            send(client_socket, &usr[myPlayerNumber+1].tot_holding, sizeof(usr[myPlayerNumber+1].tot_holding), 0);
+
 
             while(newGameCount < 5) { // first deal of cards
                 recvStruct(card,cardNumberOnScreen,client_socket);
@@ -395,7 +409,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
         display_message(usr,99, "Starting..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr);
+        loadMedia(card,-1,usr);
 // ------------------------------------------------------------------------
 
     if(1000/FPS>SDL_GetTicks()-start) {
@@ -415,6 +429,8 @@ void connect_to_server(DECK card[], PLAYER usr[]){
     dest.sin_port = htons(PORTNUM);                /* set destination port number */
     test=connect(client_socket, (struct sockaddr *)&dest, sizeof(struct sockaddr));   assert(test==0);
     recv(client_socket, &myPlayerNumber, sizeof(myPlayerNumber), 0);
+    recv(client_socket, &usr[myPlayerNumber+1].tot_holding, sizeof(usr[myPlayerNumber+1].tot_holding), 0);
+    printf("cash: %d\n",usr[myPlayerNumber+1].tot_holding);
     game_running(card,usr, dest, myPlayerNumber);
 }
 
@@ -510,6 +526,7 @@ bool loadMedia(DECK card[], int cardNumberOnScreen, PLAYER usr []){
         printf( "Failed to load image!\n" );
         success = false;
     }
+
     SDL_FreeSurface(table_img); // Frigör bild för Black Jack bordet.
     SDL_FreeSurface(hit_img); // Frigör bild för hit-knapp bordet.
     SDL_FreeSurface(stand_img); // Frigör bild för stand-knapp bordet.
@@ -630,4 +647,161 @@ void recvUsrStruct(PLAYER usr[],int user, int client_socket) {
     sscanf(score, "%d", &usr[user].score);
 }
 
+
+
+void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[]){
+        int x,y,bet=0,stand=0,betSig=1;
+        SDL_Event event;
+        while(betSig==1){
+            sleep(1);
+            loadMedia(card,cardNumberOnScreen,user);
+            display_bet_holding(user[myPlayerNr].bet, user[myPlayerNr].tot_holding);
+            SDL_UpdateWindowSurface(window);
+            while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
+
+                 switch( event.type){
+/*
+                    case SDL_QUIT:
+                        nClient[nthread].player.quit=1;
+                        nClient[nthread].player.stand=1;
+                        send(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // send stand or hit
+                        quit(nClient);
+                        close(nClient[nthread].nUser.tconsocket[nthread]);
+                        exit(0);
+*/
+                    case SDL_MOUSEBUTTONDOWN:   {// button clicks
+
+                            x = event.button.x; // used to know where on x-axis is currently being clicked
+                            y = event.button.y; // used to know where on y-axis is currently being clicked
+
+                            if (event.button.button == (SDL_BUTTON_LEFT)){
+
+                            // + 1
+                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && user[myPlayerNr].tot_holding>bet+1) { // can only be clicked while gameplay is true
+
+                                        bet+=1;
+                                        user[myPlayerNr].tot_holding-=1;
+                                        user[myPlayerNr].bet=bet;
+                                        printf("\nNew bet: %d\n",user[myPlayerNr].bet);
+                                        printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
+                                    }
+
+                            // + 10
+                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && user[myPlayerNr].tot_holding>bet+10) { // can only be clicked while gameplay is true
+
+                                        bet+=10;
+                                        user[myPlayerNr].tot_holding-=10;
+                                        user[myPlayerNr].bet=bet;
+                                        printf("\nNew bet: %d\n",user[myPlayerNr].bet);
+                                        printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
+                                    }
+
+                            // + 50
+                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && user[myPlayerNr].tot_holding>bet+50) { // can only be clicked while gameplay is true
+
+                                        bet+=50;
+                                        user[myPlayerNr].tot_holding-=50;
+                                        user[myPlayerNr].bet=bet;
+                                        printf("\nNew bet: %d\n",user[myPlayerNr].bet);
+                                        printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
+                                    }
+
+                            // + 100
+                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && user[myPlayerNr].tot_holding>bet+100) { // can only be clicked while gameplay is true
+
+                                        bet+=100;
+                                        user[myPlayerNr].tot_holding-=100;
+                                        user[myPlayerNr].bet=bet;
+                                        printf("\nNew bet: %d\n",user[myPlayerNr].bet);
+                                        printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
+                                    }
+
+                            // BET BUTTON
+                                    if(x>430 && x< 430+98 && y>530 && y<530+49) {
+                                        user[myPlayerNr].bet=bet;
+                                        betSig=0;
+                                        break;
+                                    }
+
+                            }// LEFT MOUSE
+
+            // ---------------------------------------------------------------------------------------------------------
+
+                            // RIGHT MOUSE
+
+                            // - 1
+                            if (event.button.button == (SDL_BUTTON_RIGHT)){
+                                    if(x>70 && x< 70+55 && y>86 && y<86+55 && user[myPlayerNr].bet >= 1) { // can only be clicked while gameplay is true
+
+                                            bet-=1;
+                                            user[myPlayerNr].tot_holding+=1;
+                                            user[myPlayerNr].bet=bet;
+                                        printf("\nNew bet: %d\n",user[myPlayerNr].bet);
+                                        printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
+                                    }
+
+                            // - 10
+                                    if(x>70 && x< 70+55 && y>150 && y<150+55 && user[myPlayerNr].bet >= 10) { // can only be clicked while gameplay is true
+
+                                        bet-=10;
+                                        user[myPlayerNr].tot_holding+=10;
+                                        user[myPlayerNr].bet=bet;
+                                        printf("\nNew bet: %d\n",user[myPlayerNr].bet);
+                                        printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
+                                    }
+
+                            // - 50
+                                    if(x>70 && x< 70+55 && y>215 && y<215+55 && user[myPlayerNr].bet >= 50) { // can only be clicked while gameplay is true
+
+                                        bet-=50;
+                                        user[myPlayerNr].tot_holding+=50;
+                                        user[myPlayerNr].bet=bet;
+                                        printf("\nNew bet: %d\n",user[myPlayerNr].bet);
+                                        printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
+                                    }
+
+                            // - 100
+                                    if(x>70 && x< 70+55 && y>277 && y<277+55 && user[myPlayerNr].bet >= 100) { // can only be clicked while gameplay is true
+
+                                        bet-=100;
+                                        user[myPlayerNr].tot_holding+=100;
+                                        user[myPlayerNr].bet=bet;
+                                        printf("\nNew bet: %d\n",user[myPlayerNr].bet);
+                                        printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
+
+                                    }
+                        }// RIGHT MOUSE
+                        break;
+                    } // case Mousedown
+                }// SWITCH
+            }// While inner
+    } // While outer
+}
+
+
+
+
+void display_bet_holding(int bet, int holdings){
+
+
+        char player_bet[10]="";
+        char player_holdings[15]="";
+        sprintf(player_bet, "Bet: %d", bet);
+        sprintf(player_holdings, "Holding: %d", holdings);
+
+        SDL_Color text_color = {251, 218, 15};
+        SDL_Rect textLocation = { 60,360, 0, 0 };
+        font = TTF_OpenFont("fonts/DejaVuSans.ttf", 20); // Open true type font
+        text = TTF_RenderText_Blended(font,player_bet,text_color); // Blended = smoother edges, Solid = sharper edges
+        SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
+        SDL_FreeSurface(text);
+        TTF_CloseFont(font);
+
+        SDL_Rect textLocation_holdings = { 60,390, 0, 0 }; // Position of text, relativ to user
+        font = TTF_OpenFont("fonts/DejaVuSans.ttf", 20); // Open true type font
+        text = TTF_RenderText_Blended(font,player_holdings,text_color); // Blended = smoother edges, Solid = sharper edges
+        SDL_BlitSurface(text, NULL, screen, &textLocation_holdings); // Draw to screen
+        SDL_FreeSurface(text);
+        TTF_CloseFont(font);
+}
 

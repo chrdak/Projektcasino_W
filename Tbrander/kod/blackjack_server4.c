@@ -56,6 +56,7 @@ void cardRect(DECK card [],PLAYER usr [], int* deckPosition, int userNumber);
 void sendUserInfo(DECK card[], PLAYER usr[], THREAD tdata[],int player_deckPos[]);
 void hit(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message);
 void dealerTurn(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int* deckPosition, int message);
+void flushSocket(THREAD tdata[]);
 //-----------------------------------------------------------------------------------------------------------------------
 
 //************************************ MAIN *********************************************
@@ -224,9 +225,10 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
             continue;
         }
         printf("Incoming connection\n");
-
+        usr[i+1].tot_holding=1000;
         tdata[0].tconsocket[i] = consocket;
         send(tdata[0].tconsocket[i], &i, sizeof(i), 0);
+        send(tdata[0].tconsocket[i], &usr[i+1].tot_holding, sizeof(usr[i+1].tot_holding), 0);
         ++i;
         if(i==2) {
             startGame = true;
@@ -235,7 +237,13 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
         printf("Player number %d is connected\n", i);
 
         while(startGame == true) {
-             send_flag_if_hit=5;
+
+            for(i=0;i<2;++i){
+                recv(tdata[0].tconsocket[i], &usr[i+1].bet, sizeof(usr[i+1].bet), 0);
+            }
+            printf("bet: %d\n",usr[i+1].bet);
+
+            send_flag_if_hit=5;
 
             while(dealCards == true) {
                 deal_cards(usr,card,tdata, deckPosition);
@@ -277,6 +285,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
                 close(tdata[0].tconsocket[1]);
                 return;
             }
+            flushSocket(tdata);
             sleep(5);
             dealCards = true;
             hitting = true;
@@ -395,3 +404,18 @@ void sendUsrStruct(PLAYER usr[],int user, int socketNumber) {
     send(socketNumber, &score, sizeof(score), 0);
 
 }
+
+
+
+void flushSocket(THREAD tdata[]) {
+    char flush[1500] = {0};
+    int byte = 1,i;
+    while(byte>0) {
+        for(i=1;i<3;++i){
+           byte= recv(tdata[0].tconsocket[i], &flush, sizeof(flush), MSG_DONTWAIT);
+           printf("\n TRASH: %d\n", byte);
+        }
+    }
+}
+
+
