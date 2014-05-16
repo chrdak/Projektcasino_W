@@ -52,12 +52,13 @@ void connect_to_server(DECK card[], PLAYER usr[]);
 void login_init();
 void display_message(PLAYER usr[],int userNumber, char message[]);
 void playSound(char fileName[], int soundLoop);
-void playSoundEffect(char fileName[]);
+void playSoundEffect(char fileName[],int);
 void recvStruct(DECK card[],int cardNumberOnScreen, int client_socket);
 void recvUsrStruct(PLAYER usr[],int user, int client_socket);
 void flushSocket(int socket);
 void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[]);
 void display_bet_holding(PLAYER user[],DECK card[],int,int cardNumberOnScreen);
+void waiting_for_other_player(DECK card[], int cardNumberOnScreen, PLAYER usr [],int myPlayerNumber);
 //-------------------------------------------------
 
 /*Global variables*/
@@ -68,7 +69,6 @@ bool running = true;                 // VIKTIG GLOBAL BOOL! ANVÄNDS SOM FLAGGA 
 int client_socket; // global
 int test; // assert
 
-//************************************ MAIN *********************************************
 
 int main( int argc, char* args[] ) {
     srand(time(NULL)); // Server
@@ -140,6 +140,9 @@ void login_init(){
                     running = false; // Gameloop flag false
                 }
              }
+             if (event.type ==SDL_MOUSEMOTION){
+                    SDL_UpdateWindowSurface(login_window);
+             }
           }
      }
      running = true;
@@ -162,10 +165,60 @@ void display_score(PLAYER usr[],int userNumber){
 
 void display_message(PLAYER usr[],int userNumber, char message[]){
 
+    // MESSAGE FLAGS
+    /*
+    59 = Player 2's turn.
+    69 = Your turn.
+    79 = Player 1's turn.
+    89 = Waiting for other player..
+    99 = New game in 5..4..3..2..1.. starting..
+    */
+
     SDL_Surface* text;                    // Score to be printed
     TTF_Font *font;                       // True type font to be loaded (*.ttf)
+
+    if (userNumber==59){
+            SDL_Color text_color = {247, 215, 16};
+            SDL_Rect textLocation = { 60,540, 0, 0 };
+            font = TTF_OpenFont("fonts/DejaVuSans.ttf", 36); // Open true type font
+            text = TTF_RenderText_Blended(font,message,text_color); // Blended = smoother edges, Solid = sharper edges
+            SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
+            SDL_FreeSurface(text);
+            TTF_CloseFont(font);
+
+        } // Position of text, relative to user
+    if (userNumber==69){
+            SDL_Color text_color = {247, 215, 16};
+            SDL_Rect textLocation = { 60,540, 0, 0 };
+            font = TTF_OpenFont("fonts/DejaVuSans.ttf", 36); // Open true type font
+            text = TTF_RenderText_Blended(font,message,text_color); // Blended = smoother edges, Solid = sharper edges
+            SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
+            SDL_FreeSurface(text);
+            TTF_CloseFont(font);
+
+        } // Position of text, relative to user
+    if (userNumber==79){
+            SDL_Color text_color = {247, 215, 16};
+            SDL_Rect textLocation = { 60,540, 0, 0 };
+            font = TTF_OpenFont("fonts/DejaVuSans.ttf", 36); // Open true type font
+            text = TTF_RenderText_Blended(font,message,text_color); // Blended = smoother edges, Solid = sharper edges
+            SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
+            SDL_FreeSurface(text);
+            TTF_CloseFont(font);
+
+        } // Position of text, relative to user
+    if (userNumber==89){
+            SDL_Color text_color = {247, 215, 16};
+            SDL_Rect textLocation = { 410,70, 0, 0 };
+            font = TTF_OpenFont("fonts/DejaVuSans.ttf", 36); // Open true type font
+            text = TTF_RenderText_Blended(font,message,text_color); // Blended = smoother edges, Solid = sharper edges
+            SDL_BlitSurface(text, NULL, screen, &textLocation); // Draw to screen
+            SDL_FreeSurface(text);
+            TTF_CloseFont(font);
+
+        } // Position of text, relative to user
     if (userNumber==99){
-        SDL_Color text_color = {247, 215, 16};
+        SDL_Color text_color = {247, 215, 16}; // YELLOW
         SDL_Rect textLocation = { 480,70, 0, 0 };
         font = TTF_OpenFont("fonts/DejaVuSans.ttf", 36); // Open true type font
         text = TTF_RenderText_Blended(font,message,text_color); // Blended = smoother edges, Solid = sharper edges
@@ -174,8 +227,8 @@ void display_message(PLAYER usr[],int userNumber, char message[]){
         TTF_CloseFont(font);
 
     } // Position of text, relative to user
-    else{
-        SDL_Color text_color = {155, 16, 13};
+    if (userNumber==0 || userNumber==1){
+        SDL_Color text_color = {155, 16, 13}; // RED
         SDL_Rect textLocation = { usr[userNumber].x3,usr[userNumber].y3, 0, 0 }; // Position of text, relativ to user
         font = TTF_OpenFont("fonts/DejaVuSans.ttf", 20); // Open true type font
         text = TTF_RenderText_Blended(font,message,text_color); // Blended = smoother edges, Solid = sharper edges
@@ -207,6 +260,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     const int FPS = 20;
     playSound("sound/david-luong_perto-de-voce-close-to-you.wav", -1);
 
+    playSoundEffect("sound/casino_backround_sound.wav",2);
     while(running){
         start = SDL_GetTicks();
         if(gamePlay == false) {
@@ -217,12 +271,11 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             bet_client(myPlayerNumber+1,usr,cardNumberOnScreen,card);
             send(client_socket, &usr[myPlayerNumber+1].bet, sizeof(usr[myPlayerNumber+1].bet), 0);
 
+            display_message(usr,89, "Waiting for other player..");
+            SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
             while(newGameCount < 5) { // first deal of cards
                 recvStruct(card,cardNumberOnScreen,client_socket);
-
-                if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
-                    printf("Cant load img.\n");
-                }
+                waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
                 ++newGameCount;
                 ++cardNumberOnScreen;
             }
@@ -231,9 +284,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             for(i=0;i<3;i++) {
                 recvUsrStruct(usr,i,client_socket);
             }
-            if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
-                printf("Cant load img.\n");
-            }
+            waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
 
             printf("Dealer: %d\n", usr[0].score);
             printf("Player1: %d\n", usr[1].score);
@@ -246,10 +297,12 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 //-------------------- KLIENT 2 VÄNTAR PÅ SIN TUR  ---------------------------
 
         while(gamePlay == true && myTurn == false) {
-            if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // LOAD CARDS, BUTTONS, GAMEBOARD
+            /*if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // LOAD CARDS, BUTTONS, GAMEBOARD
                 printf("Cant load img.\n");
-            }
-
+            }*/
+            waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+            display_message(usr,79, "Player 1's turn.");
+            SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
             test=recv(client_socket, &receive_flag, sizeof(receive_flag), 0);
             if(test == ENOTCONN){
                 perror("\nServer closed connection\n");
@@ -261,10 +314,16 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                 ++cardNumberOnScreen;
                 recvStruct(card,cardNumberOnScreen,client_socket);
                 recvUsrStruct(usr,1,client_socket);
+                display_message(usr,79, "Player 1's turn.");
+                SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+                continue;
             }
             if(receive_flag == myPlayerNumber) {
                  myTurn = true;
             }
+            loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+            display_message(usr,69, "Your turn.");
+            SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
         }
 
 // ------------------- KLIENT 2 HAR VÄNTAT KLART ------------------------------
@@ -296,7 +355,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                                 count ++;
                             }
                             recvUsrStruct(usr,i,client_socket);
-                            playSoundEffect("sound/cardSlide6.wav");
+                            playSoundEffect("sound/cardSlide6.wav",-1);
                             if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
                                 printf("Cant load img.\n");
                             }
@@ -305,6 +364,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                                 myTurn = false;
                                 display_message(usr,myPlayerNumber+1, "BUST");
                                 send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
+                                usr[myPlayerNumber+1].bet=0;
                             }
                         }
                         // STAND BUTTON
@@ -321,6 +381,8 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     if (myPlayerNumber+1==1){
 
         while(1) {
+            waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+            display_message(usr,59, "Player 2's turn.");
             SDL_UpdateWindowSurface(window);
             printf("\nSpelare %d väntar på flagga från klient 2\n",myPlayerNumber+1);
             test=recv(client_socket, &receive_flag, sizeof(receive_flag), 0);
@@ -340,9 +402,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                 }
                 break;
             }
-            if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
-                printf("Cant load img.\n");
-            }
+            waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         } // while client 2 i playing, recv cards if he hits, else break
     }// if user 0
 
@@ -350,9 +410,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
         ++cardNumberOnScreen;
         recvStruct(card,cardNumberOnScreen,client_socket); // receive card to be displayed on dealer part of screen
         recvUsrStruct(usr,0,client_socket); // receive current dealer score
-        if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // Calling function for loading 24-bit images in to the memory
-            printf("Cant load img.\n");
-        }
+        waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
     }
     flushSocket(client_socket);
     SDL_UpdateWindowSurface(window);
@@ -360,10 +418,12 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     if(usr[myPlayerNumber+1].score > usr[0].score && usr[myPlayerNumber+1].score < 22 || usr[0].score > 21) { // if win show yellow color rect
         display_message(usr,myPlayerNumber+1, "You Win!");
         usr[myPlayerNumber+1].tot_holding+=usr[myPlayerNumber+1].bet*2;
+                playSoundEffect("sound/winner.wav",-1);
         usr[myPlayerNumber+1].bet=0;
     }
     if(usr[0].score > usr[myPlayerNumber+1].score && usr[0].score < 22 || usr[0].score == usr[myPlayerNumber+1].score || usr[myPlayerNumber+1].score > 21) { // if lose show red color rect
         display_message(usr,myPlayerNumber+1, "You Lose..");
+        playSoundEffect("sound/loser.wav",-1);
         usr[myPlayerNumber+1].bet=0;
     }
     for(i=0;i<3;++i){ // nollställ allas poäng
@@ -379,27 +439,27 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
         display_message(usr,99, "New game in 5..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+        waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "New game in 4..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+        waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "New game in 3..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+        waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "New game in 2..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+        waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "New game in 1..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+        waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "Starting..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
+        waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
 // ------------------------------------------------------------------------
 
     if(1000/FPS>SDL_GetTicks()-start) {
@@ -553,11 +613,12 @@ void playSound(char fileName[], int soundLoop) {
 
 }
 
-void playSoundEffect(char fileName[]) {
+void playSoundEffect(char fileName[],int channel) {
      Mix_Music *music = NULL;
      Mix_Chunk *soundEffect = NULL;
+     Mix_Volume(2,50);
      soundEffect = Mix_LoadWAV(fileName);
-     Mix_PlayChannel( -1,soundEffect,0);
+     Mix_PlayChannel( channel,soundEffect,0);
      soundEffect = NULL;
      Mix_FreeChunk(soundEffect);
 }
@@ -643,7 +704,6 @@ void recvUsrStruct(PLAYER usr[],int user, int client_socket) {
     sscanf(score, "%d", &usr[user].score);
 }
 
-
 void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[]){
         int x,y,bet=0,stand=0,betSig=1;
         SDL_Event event;
@@ -652,15 +712,10 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
         while(betSig==1){
             while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
                  switch( event.type){
-/*
+
                     case SDL_QUIT:
-                        nClient[nthread].player.quit=1;
-                        nClient[nthread].player.stand=1;
-                        send(nClient[nthread].nUser.tconsocket[nthread], &user[nthread], sizeof(user[nthread]), 0); // send stand or hit
-                        quit(nClient);
-                        close(nClient[nthread].nUser.tconsocket[nthread]);
                         exit(0);
-*/
+
                     case SDL_MOUSEBUTTONDOWN:   {// button clicks
 
                             x = event.button.x; // used to know where on x-axis is currently being clicked
@@ -670,7 +725,6 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
 
                             // + 1
                                     if(x>70 && x< 70+55 && y>86 && y<86+55 && user[myPlayerNr].tot_holding>=1) { // can only be clicked while gameplay is true
-
                                         bet+=1;
                                         user[myPlayerNr].tot_holding-=1;
                                         user[myPlayerNr].bet=bet;
@@ -714,6 +768,7 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
                                         betSig=0;
                                         break;
                                     }
+                                playSoundEffect("sound/chipsStack4.wav",-1);
 
                             }// LEFT MOUSE
 
@@ -762,18 +817,20 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
                                         printf("\nHoldings: %d\n",user[myPlayerNr].tot_holding);
 
                                     }
+                                    playSoundEffect("sound/chipsStack4.wav",-1);
                         }// RIGHT MOUSE
                         loadMedia(card,-1,user,myPlayerNr);
                         display_bet_holding(user,card,myPlayerNr,cardNumberOnScreen);
                         break;
                     } // case Mousedown
+                case SDL_MOUSEMOTION: {
+                    SDL_UpdateWindowSurface(window);
+                }
                 }// SWITCH
-
             }// While inner
     } // While outer
     running=true;
 }
-
 
 void display_bet_holding(PLAYER user[],DECK card[],int myPlayerNr,int cardNumberOnScreen){
 
@@ -805,4 +862,24 @@ void display_bet_holding(PLAYER user[],DECK card[],int myPlayerNr,int cardNumber
         TTF_CloseFont(font);
         SDL_UpdateWindowSurface(window);
 }
+
+void waiting_for_other_player(DECK card[], int cardNumberOnScreen, PLAYER usr [],int myPlayerNumber){
+        int i;
+        char game_table[50]="grafik/casino_betlight_off.bmp";
+        SDL_Surface* table_lightsOff_img = NULL;  //Loaded converted table image
+        table_lightsOff_img=loadSurface(game_table);
+        SDL_BlitSurface(table_lightsOff_img, NULL, screen, NULL);
+        SDL_FreeSurface(table_lightsOff_img);
+        for(i=0;i<3;i++) {
+            display_score(usr,i); // display user and dealer score
+        }
+        for(i=0;i<cardNumberOnScreen+1;i++) {
+            card[i].card_img = SDL_LoadBMP(card[i].path);
+            SDL_BlitScaled(card[i].card_img, NULL, screen, &card[i].CardPos);
+            SDL_FreeSurface(card[i].card_img);
+        }
+        display_bet_holding(usr,card,myPlayerNumber,cardNumberOnScreen);
+}
+
+
 
