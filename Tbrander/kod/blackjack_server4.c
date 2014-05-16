@@ -59,8 +59,6 @@ void dealerTurn(PLAYER usr[],DECK card[], THREAD tdata[], int socketNumber, int*
 void flushSocket(THREAD tdata[]);
 //-----------------------------------------------------------------------------------------------------------------------
 
-//************************************ MAIN *********************************************
-
 int main( int argc, char* args[] ) {
 
     srand(time(NULL));
@@ -76,7 +74,6 @@ int main( int argc, char* args[] ) {
     }
     return 0;
 }
-//***************************************************************************************
 
 void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int* deckPosition){
 
@@ -186,7 +183,6 @@ void card_init(DECK card [], PLAYER usr[]){
     }
 }
 
-/*    SERVERKOD   */
 void server(DECK card[], PLAYER usr[], int* deckPosition) {
     int server_socket,i=0, j;
     int listen_socket; // socket used to listen for incoming connections
@@ -232,8 +228,8 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
         ++i;
         if(i==2) {
             startGame = true;
+            //fork() här kanske?
         }
-
         printf("Player number %d is connected\n", i);
 
         while(startGame == true) {
@@ -402,8 +398,6 @@ void sendUsrStruct(PLAYER usr[],int user, int socketNumber) {
     send(socketNumber, &score, sizeof(score), 0);
 
 }
-
-
 
 void flushSocket(THREAD tdata[]) {
     char flush[1500] = {0};
