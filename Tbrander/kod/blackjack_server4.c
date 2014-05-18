@@ -60,7 +60,7 @@ void flushSocket(THREAD tdata[]);
 //-----------------------------------------------------------------------------------------------------------------------
 
 int main( int argc, char* args[] ) {
-
+    while(1){
     srand(time(NULL));
     DECK card[54];
     PLAYER usr[5];
@@ -69,7 +69,6 @@ int main( int argc, char* args[] ) {
     *deckPosition = 0; // current card playing position in deck
     card_init(card,usr); // // Klient, server
     shuffleDeck(card); // Server
-    while(1){
     server(card,usr,deckPosition);
     }
     return 0;
@@ -100,7 +99,7 @@ void deal_cards(PLAYER usr[],DECK card[], THREAD tdata[], int* deckPosition){
     usr[1].x1 = 685;
     usr[2].x1 = 425;
 
-    usr[0].y1 = 150;
+    usr[0].y1 = 120;
     usr[1].y1 = 380;
     usr[2].y1 = 380;
 
@@ -184,6 +183,7 @@ void card_init(DECK card [], PLAYER usr[]){
 }
 
 void server(DECK card[], PLAYER usr[], int* deckPosition) {
+
     int server_socket,i=0, j;
     int listen_socket; // socket used to listen for incoming connections
     struct sockaddr_in serv, dest;
@@ -203,7 +203,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
     THREAD tdata[5]; // this is the threads individual data(struct server_threads)
     i = 0; // reseting the variable for future use
 
-    int pid=getpid();
+    int pid;
     socklen_t socksize = sizeof(struct sockaddr_in);
     memset(&serv, 0, sizeof(serv));           // zero the struct before filling the fields
     serv.sin_family = AF_INET;                // set the type of connection to TCP/IP
@@ -227,8 +227,10 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
         send(tdata[0].tconsocket[i], &usr[i+1].tot_holding, sizeof(usr[i+1].tot_holding), 0);
         ++i;
         if(i==2) {
+            // FORK WHEN SECOND PLAYER CONNECTS
+           /* pid=fork();
+            if (pid==0){ return;}*/
             startGame = true;
-            //fork() här kanske?
         }
         printf("Player number %d is connected\n", i);
 

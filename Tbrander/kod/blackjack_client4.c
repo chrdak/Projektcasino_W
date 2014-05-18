@@ -243,10 +243,9 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     while(running){
         start = SDL_GetTicks();
         if(gamePlay == false) {
+            cardNumberOnScreen=0;
             count=0;
-            cardNumberOnScreen = 0;
             printf("New Game\n");
-
             bet_client(myPlayerNumber+1,usr,cardNumberOnScreen,card);
             send(client_socket, &usr[myPlayerNumber+1].bet, sizeof(usr[myPlayerNumber+1].bet), 0);
 
@@ -258,19 +257,15 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                 ++newGameCount;
                 ++cardNumberOnScreen;
             }
-            for(i=0;i<3;++i){ // nollställ allas poäng
-                usr[i].score=0;
-            }
-
             // FIRST DEAL
             for(i=0;i<3;i++) {
                 recvUsrStruct(usr,i,client_socket);
             }
             waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
-
-            printf("Dealer: %d\n", usr[0].score);
-            printf("Player1: %d\n", usr[1].score);
-            printf("Player2: %d\n", usr[2].score);
+            if (myPlayerNumber+1==1){display_message(usr,79, "You are player 1!");}
+            if (myPlayerNumber+1==2){display_message(usr,79, "You are player 2!");}
+            SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+            sleep(2); // För att fördröja medelandet om vilken spelare man är så man hinner läsa
             newGameCount=0;
             gamePlay = true;
         }
@@ -279,9 +274,6 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 //-------------------- KLIENT 2 VÄNTAR PÅ SIN TUR  ---------------------------
 
         while(gamePlay == true && myTurn == false) {
-            /*if (!loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1)){ // LOAD CARDS, BUTTONS, GAMEBOARD
-                printf("Cant load img.\n");
-            }*/
             waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
             display_message(usr,79, "Player 1:s turn.");
             SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
@@ -349,9 +341,18 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                                 myTurn = false;
                                 display_message(usr,79, "Busted!");
                                 SDL_UpdateWindowSurface(window);
+                                sleep(1); //Fördröj medelandet "Busted!"
                                 send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
                                 usr[myPlayerNumber+1].bet=0;
                             }
+                            if(usr[myPlayerNumber+1].score == 21) { // if player bust
+                                myTurn = false;
+                                display_message(usr,79, "Blackjack!");
+                                SDL_UpdateWindowSurface(window);
+                                sleep(1); //Fördröj medelandet "Blackjack!"
+                                send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
+                            }
+
                         }
                         // STAND BUTTON
                         if(x>610 && x< 610+98 && y>530 && y<530+49 && usr[myPlayerNumber+1].score <= 21 && gamePlay == true) { // stand button
@@ -399,7 +400,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
     waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
     flushSocket(client_socket);
 
-    if(usr[myPlayerNumber+1].score > usr[0].score && usr[myPlayerNumber+1].score < 22 || usr[0].score > 21) { // if win show yellow color rect
+    if(usr[myPlayerNumber+1].score > usr[0].score && usr[myPlayerNumber+1].score < 22 || usr[0].score > 21 && usr[myPlayerNumber+1].score < 22) { // if win show yellow color rect
         display_message(usr,79, "You Win!");
         usr[myPlayerNumber+1].tot_holding+=usr[myPlayerNumber+1].bet*2;
         playSoundEffect("sound/winner.wav",-1);
@@ -436,6 +437,10 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
         display_message(usr,99, "New game in 1..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
+        for(i=0;i<3;++i){ // nollställ allas poäng
+            usr[i].score=0;
+        }
+        cardNumberOnScreen = -1;
         waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
         display_message(usr,99, "Starting..");
         SDL_UpdateWindowSurface(window);
@@ -456,7 +461,8 @@ void connect_to_server(DECK card[], PLAYER usr[]){
     client_socket = socket(AF_INET, SOCK_STREAM, 0); assert(client_socket!=-1);
     memset(&dest, 0, sizeof(dest));                /* zero the struct */
     dest.sin_family = AF_INET;
-    dest.sin_addr.s_addr = inet_addr("130.237.84.123"); /* set destination IP number */
+    //dest.sin_addr.s_addr = inet_addr("130.237.84.123"); /* set destination IP number */
+    dest.sin_addr.s_addr = inet_addr("127.0.0.1"); /* set destination IP number */
     dest.sin_port = htons(PORTNUM);                /* set destination port number */
     test=connect(client_socket, (struct sockaddr *)&dest, sizeof(struct sockaddr));   assert(test==0);
     recv(client_socket, &myPlayerNumber, sizeof(myPlayerNumber), 0);
@@ -746,12 +752,14 @@ void bet_client(int myPlayerNr,PLAYER user[],int cardNumberOnScreen,DECK card[])
                             // BET BUTTON
                                     if(x>550 && x< 550+98 && y>530 && y<530+49) {
                                         if (user[myPlayerNr].bet <=0){
-                                            display_message(user,89, "Place your bet please!");
+                                            display_message(user,79, "Place your bet please!");
                                             SDL_UpdateWindowSurface(window);
+                                            sleep(1); // delay the message
                                         }
                                         else{
                                         user[myPlayerNr].bet=bet;
                                         betSig=0;
+                                        playSoundEffect("sound/chipsStack4.wav",-1);
                                         break;
                                         }
                                     }
