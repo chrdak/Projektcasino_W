@@ -1,0 +1,34 @@
+Kompileringsingsinstruktioner för Klient: 
+gcc blackjack_client4.c -o casino_client -lSDL2 -lSDL2_ttf `sdl-config --libs` -lSDL2_mixer libs/Client/recvStr.o libs/Client/txt_display.o libs/Client/sound.o libs/Client/Casino_graphic.o libs/Client/bet.o libs/Client/Casino_login.o libs/Client/SDL_init.o
+
+
+Kompileringsinstruktioner för Server:
+gcc blackjack_server4.c -o casino_server -lpthread libs/Server/SendStr.o libs/Server/Cards.o libs/Server/Card_Initialize.o libs/Server/Blackjack.o
+
+
+
+Dessa inkluderingar ska finnas i Klienten:
+
+#include "libs/Client/recvStr.h"
+#include "libs/Client/structs.h"
+#include "libs/Client/sound.h"
+#include "libs/Client/SDL_GameVariables.h"
+#include "libs/Client/SDL_init.h"
+#include "libs/Client/txt_display.h"
+#include "libs/Client/Casino_graphic.h"
+#include "libs/Client/bet.h"
+#include "libs/Client/Casino_login.h"
+
+
+
+
+Dessa ska finnas i Servern:
+
+#include "libs/Server/SendStr.h"
+#include "libs/Server/Cards.h"
+#include "libs/Server/Card_Initialize.h"
+#include "libs/Server/Blackjack.h"
+
+
+
+
