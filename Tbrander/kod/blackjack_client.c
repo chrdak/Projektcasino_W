@@ -1,3 +1,12 @@
+/**************************************************************************************
+ * Project Group: Project Casino (TIDAA1)                                             *
+ * Date: 2014-05-27                                                                   *
+ * Focus: Software - Computer Engineering and Internet Technology HI1026              *
+ * College/Institution - Royal Institute of Technology - STH                          *
+ * Filename: blackjack_client.c                                                       *
+ * Brief Description - Client for the blackjack game created by: Project Casino       *
+ * Graphical representation,sound and betting is the primary focus on the client.     *
+ **************************************************************************************/
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -19,6 +28,8 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <assert.h>
+
+/////////////Defined_Libraries//////////////////
 #include "libs/Client/recvStr.h"
 #include "libs/Client/structs.h"
 #include "libs/Client/sound.h"
@@ -45,8 +56,7 @@ void flushSocket(int socket);
 //-------------------------------------------------
 
 /*Global variables*/
-bool running = true;                 // VIKTIG GLOBAL BOOL! ANVÄNDS SOM FLAGGA FÖR VILKET SPELBORD SOM SKA PRINTAS UT I loadMedia()
-int test; // assert
+bool running = true;                 //GLOBAL BOOL! Used as a flag to load the appropriate table in the function: "Loadmedia"
 
 
 int main( int argc, char* args[] ) {
@@ -80,7 +90,7 @@ void flushSocket(int socket) {
 }
 
 void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPlayerNumber, int client_socket){
-    int x,y,i,j, count = 0; // x,y kordinater, i,j räknare
+    int x,y,i,j, count = 0; // x,y coordinates, i,j counters
     int hit = 0; // message to server for hit
     int stand = 1; // message to server for stand
     int newGameCount = 0; // keeps count on how many times to receive data when new game starts (deal cards function in server)
@@ -112,7 +122,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             send(client_socket, &usr[myPlayerNumber+1].bet, sizeof(usr[myPlayerNumber+1].bet), 0);
 
             display_message(usr,89, "Waiting for other player..");
-            SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+            SDL_UpdateWindowSurface(window);
             while(newGameCount < 5) { // first deal of cards
                 recvStruct(card,cardNumberOnScreen,client_socket);
                 waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
@@ -126,32 +136,32 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
             if (myPlayerNumber+1==1){display_message(usr,79, "You are player 1!");}
             if (myPlayerNumber+1==2){display_message(usr,79, "You are player 2!");}
-            SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
-            sleep(2); // För att fördröja medelandet om vilken spelare man är så man hinner läsa
+            SDL_UpdateWindowSurface(window);
+            sleep(2); // Delay to make sure every player has time to acknowledge the message above
             newGameCount=0;
             gamePlay = true;
         }
 
 
-//-------------------- KLIENT 2 VÄNTAR PÅ SIN TUR  ---------------------------
+//-------------------- Client 2 awaits his turn  ---------------------------
 
         while(gamePlay == true && myTurn == false) {
             waiting_for_other_player(card,cardNumberOnScreen,usr,myPlayerNumber+1);
             display_message(usr,79, "Player 1:s turn.");
-            SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+            SDL_UpdateWindowSurface(window);
             test=recv(client_socket, &receive_flag, sizeof(receive_flag), 0);
             if(test == ENOTCONN){
                 perror("\nServer closed connection\n");
 
             }
-            // Tar emot kort och poäng
+            // Recieving cards and points/score
             if (receive_flag==5){
                 flushSocket(client_socket);
                 ++cardNumberOnScreen;
                 recvStruct(card,cardNumberOnScreen,client_socket);
                 recvUsrStruct(usr,1,client_socket);
                 display_message(usr,79, "Player 1:s turn.");
-                SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+                SDL_UpdateWindowSurface(window);
                 continue;
             }
             if(receive_flag == myPlayerNumber) {
@@ -159,15 +169,15 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             }
             loadMedia(card,cardNumberOnScreen,usr,myPlayerNumber+1);
             display_message(usr,79, "Your turn.");
-            SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+            SDL_UpdateWindowSurface(window);
         }
 
-// ------------------- KLIENT 2 HAR VÄNTAT KLART ------------------------------
+// ------------------- Client 2 has recieved his turn ------------------------------
 
 
         while(SDL_PollEvent(&event)) { /* POLL EVERYTHING FROM EVENTSTACK */ }
 
-        SDL_UpdateWindowSurface(window); // DENNA KOD RAD GÖR ATT VI FÅR BILD!!
+        SDL_UpdateWindowSurface(window);
 
         while(myTurn == true){ // GAME LOOP
             while( SDL_PollEvent( &event )) {// Check if user is closing the window --> then call quit
@@ -203,7 +213,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                                 myTurn = false;
                                 display_message(usr,79, "Busted!");
                                 SDL_UpdateWindowSurface(window);
-                                sleep(1); //Fördröj medelandet "Busted!"
+                                sleep(1); // "Busted!"
                                 send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
                                 usr[myPlayerNumber+1].bet=0;
                             }
@@ -211,7 +221,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
                                 myTurn = false;
                                 display_message(usr,79, "Blackjack!");
                                 SDL_UpdateWindowSurface(window);
-                                sleep(1); //Fördröj medelandet "Blackjack!"
+                                sleep(1); // "Blackjack!"
                                 send(client_socket, &stand, sizeof(stand), 0); // send stand message to server
                             }
 
@@ -236,7 +246,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
             if(test == ENOTCONN){
                 perror("\nServer closed connection\n");
             }
-            // Tar emot kort och poäng
+            // Recieves card and points
             if (receive_flag==5){
                 ++cardNumberOnScreen;
                 recvStruct(card,cardNumberOnScreen,client_socket);
@@ -299,7 +309,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
         display_message(usr,99, "New game in 1..");
         SDL_UpdateWindowSurface(window);
         sleep(1);
-        for(i=0;i<3;++i){ // nollställ allas poäng
+        for(i=0;i<3;++i){ // Reseting every players score
             usr[i].score=0;
         }
         cardNumberOnScreen = -1;
@@ -326,6 +336,7 @@ void game_running(DECK card [], PLAYER usr[], struct sockaddr_in dest, int myPla
 
 void connect_to_server(DECK card[], PLAYER usr[]){
     int myPlayerNumber,client_socket=0;
+    int test;
     struct sockaddr_in dest;
     client_socket = socket(AF_INET, SOCK_STREAM, 0); assert(client_socket!=-1);
     memset(&dest, 0, sizeof(dest));                /* zero the struct */
@@ -342,14 +353,8 @@ void connect_to_server(DECK card[], PLAYER usr[]){
 
 void quit(DECK card[]){
     int i;
-    //Quit SDL_ttf
     TTF_Quit();
-    // Frigör bilder för spelkorten.
-
-    //SDL_FreeSurface(table_img); // Frigör bild för Black Jack bordet.
-    //SDL_FreeSurface(hit_img); // Frigör bild för hit-knapp bordet.
-    //SDL_FreeSurface(stand_img); // Frigör bild för stand-knapp bordet.
-    SDL_DestroyWindow(window);  // Dödar fönstret
+    SDL_DestroyWindow(window);  // Destroys the window
     SDL_Quit();
 }
 

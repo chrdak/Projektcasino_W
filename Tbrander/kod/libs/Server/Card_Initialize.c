@@ -1,3 +1,11 @@
+/****************************************************************
+* Requirements: See comment below about required libraries      *
+* Requires the Structs from: structs_Server.h                   *
+*                                                               *
+* Purpose: Function handles the initialization of all the cards *
+* from the specified library above.                             *
+*****************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

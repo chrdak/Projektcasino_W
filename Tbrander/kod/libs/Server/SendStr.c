@@ -1,3 +1,12 @@
+/******************************************************************
+* Requirements: See comment below about required libraries        *
+* Requires the Structs from: structs_Server.h(SendStr.h)          *
+*                                                                 *
+* Purpose: This library focuses on the communication with the     *
+* Client. It will convert the struct into strings and send it to  *
+* the specified client.                                           *
+*******************************************************************/
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>

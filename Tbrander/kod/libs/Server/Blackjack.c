@@ -1,7 +1,17 @@
+/*****************************************************************
+* Requirements: See comment below about required libraries       *
+* Requires the Structs from: structs_Server.h, and their         *
+* initialized cards and values from Card_Initialize.h.and Cards.h*
+* Note that to send data to the the client you will also require:*
+* Sendstr.h                                                      *
+* Purpose: Function handles the blackjack logic and dealer AI.   *
+*****************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+//////////Defined_Libraries///////////////
 #include "SendStr.h"
 #include "Cards.h"
 #include "Blackjack.h"

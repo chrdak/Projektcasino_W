@@ -1,3 +1,13 @@
+/***********************************************************************
+ * Project Group: Project Casino (TIDAA1)                              *
+ * Date: 2014-05-27                                                    *
+ * Focus:Software - Computer Engineering and Internet Technology HI1026*
+ * College/Institution - Royal Institute of Technology - STH           *
+ * Filename: blackjack_server.c                                        *
+ * Brief Description - Server for the blackjack game created by:       *
+ * Project Casino. Dealer AI and the blackjack logic is the main focus *
+ ***********************************************************************/
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
@@ -16,6 +26,8 @@
 #include <assert.h>
 #include <netinet/in.h>
 #include <pthread.h>
+
+//////////////Defined_Libraries/////////////////
 #include "libs/Server/SendStr.h"
 #include "libs/Server/Cards.h"
 #include "libs/Server/Card_Initialize.h"
@@ -24,7 +36,7 @@
 #define SOCK_PATH "Casino_socket"
 
 
-/*FUNKTIONS PROTOTYPER*/
+/*FUNKTION Prototype*/
 
 void server(DECK card[], PLAYER usr[], int* deckPosition);
 
@@ -37,8 +49,8 @@ int main( int argc, char* args[] ) {
     int dP;
     int* deckPosition = &dP;
     *deckPosition = 0; // current card playing position in deck
-    card_init(card,usr); // // Klient, server
-    shuffleDeck(card); // Server
+    card_init(card,usr);
+    shuffleDeck(card);
     server(card,usr,deckPosition);
     return 0;
 }
@@ -88,9 +100,6 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
         send(tdata[0].tconsocket[i], &usr[i+1].tot_holding, sizeof(usr[i+1].tot_holding), 0);
         ++i;
         if(i==2) {
-            // FORK WHEN SECOND PLAYER CONNECTS
-           /* pid=fork();
-            if (pid==0){ return;}*/
             startGame = true;
         }
         printf("Player number %d is connected\n", i);
@@ -108,7 +117,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
             }
             while(dealCards == false && hitMe == true) {
                 for(i=0;i<2;i++){
-                    send(tdata[0].tconsocket[i], &i, sizeof(i), 0); // VILKEN SPELARE
+                    send(tdata[0].tconsocket[i], &i, sizeof(i), 0); // Which player
                     hitting = true;
                     while(hitting == true){
                         test = recv(tdata[0].tconsocket[i], &message, sizeof(message), 0); // 0= hit 1=STAND
@@ -131,7 +140,7 @@ void server(DECK card[], PLAYER usr[], int* deckPosition) {
                         hitMe = false;
                     }
                 }
-            } // GAMELOOP för klientspel
+            } // GAMELOOP for client game
 
             send_flag_if_hit=6;
             send(tdata[0].tconsocket[0], &send_flag_if_hit, sizeof(send_flag_if_hit), 0);
