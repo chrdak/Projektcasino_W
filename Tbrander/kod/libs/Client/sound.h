@@ -1,3 +1,9 @@
+/****************************************************************
+* Purpose: Function handles the sound for every client          *
+*                                                               *
+*                                                               *
+*****************************************************************/
+
 #ifndef SOUND_H_INCLUDED
 #define SOUND_H_INCLUDED
 

@@ -1,3 +1,14 @@
+/****************************************************************
+* Requirements: See comment below about required libraries      *
+* Graphic functions for the client. Requires the library:       *
+* -SDL_GameVariables and structs from the struct.h file         *
+*                                                               *
+* Purpose: Function handles text in the Gui for every client.   *
+* Note that the function doesn`t send any data to the server.   *
+*                                                               *
+*                                                               *
+*****************************************************************/
+
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>

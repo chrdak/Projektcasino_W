@@ -1,11 +1,24 @@
+/****************************************************************
+* Requirements: See comment below about required libraries      *
+* Graphic functions for the client. Requires the library:       *
+* -SDL_GameVariables                                            *
+*                                                               *
+* Purpose: Function handles the startup_screen for every client.*
+* Note that the function doesn`t send any data to the server.   *
+*                                                               *
+*                                                               *
+*****************************************************************/
+
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 
+////////////////Defined_Libraries///////////////////
 #include "Casino_login.h"
 #include "SDL_GameVariables.h"
+////////////////////////////////////////////////////
 
 #define WINDOW_TITLE "Projekt Casino"
 

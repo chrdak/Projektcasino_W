@@ -1,3 +1,15 @@
+/****************************************************************
+* Requirements: See comment below about required libraries      *
+* Bet function for the client. Requires the functions:          *
+* -Loadmedia (casino graphics.txt), and the structs located in  *
+* (structs.h), PlaySoundEffect(sound.h)                         *
+*                                                               *
+* Purpose: Function handles betting for every client. Note that *
+* the function doesn`t send any data to the server.             *
+*                                                               *
+*****************************************************************/
+
+
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 #include <stdio.h>

@@ -1,3 +1,9 @@
+/****************************************************************
+* Purpose: Function handles the sound for every client          *
+*                                                               *
+*                                                               *
+*****************************************************************/
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_mixer.h>

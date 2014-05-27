@@ -1,10 +1,22 @@
+/****************************************************************
+* Requirements: See comment below about required libraries      *
+* Graphic functions for the client. Requires the functions:     *
+* -display_bet osv (txt_display.h), and the structs located in  *
+* (structs.h)                                                   *
+*                                                               *
+* Purpose: Function handles the Gui for every client. Note that *
+* the function doesn`t send any data to the server.             *
+*                                                               *
+*****************************************************************/
+
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 
+////////////////Defined_Libraries///////////////////
 #include "Casino_graphic.h"
 #include "txt_display.h"
 #include "structs.h"
-
+////////////////////////////////////////////////////
 
 bool loadMedia(DECK card[], int cardNumberOnScreen, PLAYER usr [],int myPlayerNumber){
     //Loading success flag

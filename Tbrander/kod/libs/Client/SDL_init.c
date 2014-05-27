@@ -1,3 +1,9 @@
+/****************************************************************
+* Purpose: Function handles the initialization of SDL           *
+*                                                               *
+*                                                               *
+*****************************************************************/
+
 #include <SDL2/SDL.h>
 #include "SDL_init.h"
 

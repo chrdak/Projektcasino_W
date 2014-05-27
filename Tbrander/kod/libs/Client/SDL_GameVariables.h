@@ -1,3 +1,5 @@
+/*** Purpose: Important variables in th program Blackjack_Client*/
+
 #ifndef SDL_VARIABLES_H_INCLUDED
 #define SDL_VARIABLES_H_INCLUDED
 #include <stdbool.h>
